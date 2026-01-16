@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { Star, ArrowRight, ArrowLeft, Check, Copy, Mic, Video, StopCircle, Play, Pause } from "lucide-react";
+import { Star, ArrowRight, ArrowLeft, Check, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Progress } from "@/components/ui/progress";
 import confetti from "canvas-confetti";
-
+import { VideoRecorder } from "@/components/testimonials/VideoRecorder";
+import { AudioRecorder } from "@/components/testimonials/AudioRecorder";
 type FormStep = "sentiment" | "welcome" | "question" | "thankyou";
 type QuestionType = "short_text" | "long_text" | "rating" | "video" | "audio" | "multiple_choice";
 
@@ -47,8 +47,6 @@ export default function PublicForm() {
   const [sentimentScore, setSentimentScore] = useState<number | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
   const [copiedCode, setCopiedCode] = useState(false);
 
   const formData = mockFormData;
@@ -311,63 +309,22 @@ export default function PublicForm() {
 
                     {/* VIDEO */}
                     {q.type === "video" && (
-                      <div className="text-center">
-                        <p className="text-lg mb-4">Ready for your close-up? 📹</p>
-                        <div className="aspect-video bg-muted rounded-2xl mb-4 flex items-center justify-center">
-                          {!isRecording ? (
-                            <Button
-                              onClick={() => setIsRecording(true)}
-                              className="h-16 w-16 rounded-full bg-destructive hover:bg-destructive/90"
-                            >
-                              <Video className="w-8 h-8" />
-                            </Button>
-                          ) : (
-                            <div className="text-center">
-                              <div className="text-4xl font-mono mb-2">{recordingTime}s</div>
-                              <Button
-                                onClick={() => setIsRecording(false)}
-                                variant="outline"
-                                className="rounded-full"
-                              >
-                                <StopCircle className="w-5 h-5 mr-2" />
-                                Stop Recording
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground">💡 Tip: Good lighting helps!</p>
-                      </div>
+                      <VideoRecorder
+                        maxDuration={60}
+                        onRecordingComplete={(blob, url) => {
+                          setAnswers({ ...answers, [q.id]: { blob, url } });
+                        }}
+                      />
                     )}
 
                     {/* AUDIO */}
                     {q.type === "audio" && (
-                      <div className="text-center">
-                        <p className="text-lg mb-4">Tell us in your own words 🎤</p>
-                        <Button
-                          onClick={() => setIsRecording(!isRecording)}
-                          className={`h-20 w-20 rounded-full ${
-                            isRecording
-                              ? "bg-destructive animate-pulse"
-                              : "gradient-sunny"
-                          }`}
-                        >
-                          <Mic className="w-10 h-10" />
-                        </Button>
-                        {isRecording && (
-                          <div className="mt-4 flex items-center justify-center gap-1">
-                            {Array.from({ length: 20 }).map((_, i) => (
-                              <div
-                                key={i}
-                                className="w-1 bg-primary rounded-full animate-pulse"
-                                style={{
-                                  height: `${Math.random() * 32 + 8}px`,
-                                  animationDelay: `${i * 0.05}s`,
-                                }}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      <AudioRecorder
+                        maxDuration={120}
+                        onRecordingComplete={(blob, url) => {
+                          setAnswers({ ...answers, [q.id]: { blob, url } });
+                        }}
+                      />
                     )}
                   </div>
                 );
