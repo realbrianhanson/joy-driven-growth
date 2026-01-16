@@ -12,6 +12,10 @@ import Campaigns from "./pages/Campaigns";
 import CampaignBuilder from "./pages/CampaignBuilder";
 import AiInterview from "./pages/AiInterview";
 import PublicForm from "./pages/PublicForm";
+import Widgets from "./pages/Widgets";
+import WidgetBuilder from "./pages/WidgetBuilder";
+import WallOfLove from "./pages/WallOfLove";
+import WallBuilder from "./pages/WallBuilder";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +35,10 @@ const App = () => (
           <Route path="/dashboard/forms/:id/edit" element={<FormBuilder />} />
           <Route path="/dashboard/campaigns" element={<Campaigns />} />
           <Route path="/dashboard/campaigns/new" element={<CampaignBuilder />} />
+          <Route path="/dashboard/widgets" element={<Widgets />} />
+          <Route path="/dashboard/widgets/:id" element={<WidgetBuilder />} />
+          <Route path="/dashboard/walls" element={<WallOfLove />} />
+          <Route path="/dashboard/walls/:id" element={<WallBuilder />} />
           <Route path="/collect/:slug" element={<PublicForm />} />
           <Route path="/collect/:slug/ai" element={<AiInterview />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
