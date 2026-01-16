@@ -1,1 +1,4 @@
 project_id = "ldniwvyjycerpdlwhntu"
+
+[functions.generate-content]
+verify_jwt = false
