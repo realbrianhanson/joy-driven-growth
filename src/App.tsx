@@ -19,6 +19,7 @@ import WallBuilder from "./pages/WallBuilder";
 import ContentStudio from "./pages/ContentStudio";
 import ContentLibrary from "./pages/ContentLibrary";
 import VideoEditor from "./pages/VideoEditor";
+import Analytics from "./pages/Analytics";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -45,6 +46,7 @@ const App = () => (
           <Route path="/dashboard/content" element={<ContentStudio />} />
           <Route path="/dashboard/content/library" element={<ContentLibrary />} />
           <Route path="/dashboard/content/video-editor" element={<VideoEditor />} />
+          <Route path="/dashboard/analytics" element={<Analytics />} />
           <Route path="/collect/:slug" element={<PublicForm />} />
           <Route path="/collect/:slug/ai" element={<AiInterview />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
