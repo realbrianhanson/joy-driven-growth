@@ -110,12 +110,6 @@ const Hero = ({ isLoggedIn }: { isLoggedIn: boolean }) => (
 
     <div className="relative max-w-6xl mx-auto px-6 pt-20 md:pt-28 pb-8">
       <div className="text-center max-w-4xl mx-auto">
-        <motion.div variants={fadeIn} initial="hidden" animate="visible">
-          <span className="inline-flex items-center gap-2 rounded-full bg-primary/8 border border-primary/15 px-4 py-1.5 text-xs font-semibold text-primary mb-8">
-            <Zap className="w-3.5 h-3.5" />
-            Now with AI-powered interviews &amp; revenue attribution
-          </span>
-        </motion.div>
 
         <motion.h1
           variants={fadeUp}
