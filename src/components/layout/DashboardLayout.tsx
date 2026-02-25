@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
+import { useDemoMode } from "@/contexts/DemoModeContext";
+import { DemoModeBanner } from "@/components/layout/DemoModeBanner";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -151,16 +153,22 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const { isDemoMode } = useDemoMode();
+
+  // Banner is 40px tall; offset everything when visible
+  const bannerH = isDemoMode || !localStorage.getItem("live-banner-dismissed") ? "h-10" : "h-0";
 
   return (
     <div className="min-h-screen flex w-full bg-background">
+      <DemoModeBanner />
+
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-60 shrink-0 border-r border-border bg-card flex-col fixed inset-y-0 left-0 z-30">
+      <aside className={`hidden md:flex w-60 shrink-0 border-r border-border bg-card flex-col fixed left-0 z-30 top-10 bottom-0`}>
         <SidebarContent />
       </aside>
 
       {/* Mobile header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 border-b border-border bg-card flex items-center px-4">
+      <div className="md:hidden fixed top-10 left-0 right-0 z-40 h-14 border-b border-border bg-card flex items-center px-4">
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon">
@@ -180,7 +188,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* Main content */}
-      <main className="flex-1 md:ml-60 mt-14 md:mt-0 overflow-y-auto">
+      <main className="flex-1 md:ml-60 mt-24 md:mt-10 overflow-y-auto">
         {children}
       </main>
     </div>

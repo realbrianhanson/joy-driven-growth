@@ -6,8 +6,20 @@ import {
   Bell,
   Save,
   Upload,
-  Check
+  Check,
+  Eye
 } from "lucide-react";
+import { useDemoMode } from "@/contexts/DemoModeContext";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +36,8 @@ import { toast } from "sonner";
 import SettingsLayout from "@/components/settings/SettingsLayout";
 
 const SettingsGeneral = () => {
+  const { isDemoMode, toggleDemoMode } = useDemoMode();
+  const [demoConfirmOpen, setDemoConfirmOpen] = useState(false);
   const [orgName, setOrgName] = useState("Acme Corp");
   const [urlSlug, setUrlSlug] = useState("acme-corp");
   const [industry, setIndustry] = useState("saas");
@@ -234,9 +248,64 @@ const SettingsGeneral = () => {
           </CardContent>
         </Card>
 
+        {/* Demo Mode */}
+        <Card className="bg-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5 text-primary" />
+              Demo & Preview
+            </CardTitle>
+            <CardDescription>
+              Show sample data to showcase the app without real client data.
+              Perfect for demos, screenshots, and onboarding walkthroughs.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <Label>Demo Mode</Label>
+                <p className="text-sm text-muted-foreground">
+                  {isDemoMode ? "Currently showing sample data" : "Currently showing live data"}
+                </p>
+              </div>
+              <Switch
+                checked={isDemoMode}
+                onCheckedChange={() => {
+                  if (isDemoMode) {
+                    setDemoConfirmOpen(true);
+                  } else {
+                    toggleDemoMode();
+                  }
+                }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Demo data is stored locally and never sent to your database.
+            </p>
+          </CardContent>
+        </Card>
+
+        <AlertDialog open={demoConfirmOpen} onOpenChange={setDemoConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Switch to live data?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Demo data will be hidden. Your real data will be shown.
+                You can switch back to demo mode at any time.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep Demo Mode</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { toggleDemoMode(); setDemoConfirmOpen(false); }}>
+                Switch to Live Data
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         {/* Save Button */}
         <div className="flex justify-end">
-          <Button onClick={handleSave} className="gradient-sunny text-white">
+          <Button onClick={handleSave}>
             <Save className="w-4 h-4 mr-2" />
             Save Changes
           </Button>
