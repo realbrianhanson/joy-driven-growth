@@ -244,8 +244,8 @@ export function TestimonialDetail({
 
               {/* Source */}
               <Badge variant="outline">
-                {sourceConfig[testimonial.source].emoji} Collected via{" "}
-                {sourceConfig[testimonial.source].label}
+              {(sourceConfig[testimonial.source] ?? sourceConfig.form).emoji} Collected via{" "}
+              {(sourceConfig[testimonial.source] ?? sourceConfig.form).label}
               </Badge>
 
               {/* Date */}
