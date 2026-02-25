@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Upload, Users, MessageSquare, Calendar, Send, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Users, MessageSquare, Calendar, Send, Check, Loader2, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,102 +8,197 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-
-interface Recipient {
-  name: string;
-  phone: string;
-  company?: string;
-}
+import { useForms } from "@/hooks/use-forms";
+import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
 
 const steps = [
-  { id: 1, title: "Recipients", icon: Users },
+  { id: 1, title: "Setup", icon: Check },
   { id: 2, title: "Message", icon: MessageSquare },
-  { id: 3, title: "Timing", icon: Calendar },
-  { id: 4, title: "Form", icon: Check },
-  { id: 5, title: "Review", icon: Send },
+  { id: 3, title: "Recipients", icon: Users },
+  { id: 4, title: "Schedule", icon: Calendar },
 ];
 
-const messageTemplates = [
-  {
-    id: "friendly",
-    name: "Friendly Ask",
-    preview: "Hey {name}! 👋 Quick favor - would you share your experience with us? Takes 60 sec: {link}",
-  },
-  {
-    id: "professional",
-    name: "Professional",
-    preview: "Hi {name}, we'd love your feedback on your experience with [Company]. Your insights help us improve: {link}",
-  },
-  {
-    id: "personal",
-    name: "Personal Touch",
-    preview: "Hi {name}! I hope you're doing well. I was wondering if you'd be willing to share a quick testimonial? It would mean a lot to us: {link}",
-  },
-];
+const SMS_CHAR_LIMIT = 160;
+
+function parsePhoneNumbers(text: string): string[] {
+  return text
+    .split(/[\n,]+/)
+    .map((s) => s.trim())
+    .filter((s) => {
+      if (!s) return false;
+      // starts with + and at least 10 digits, or 10+ digits
+      const digits = s.replace(/\D/g, "");
+      return digits.length >= 10;
+    });
+}
 
 export default function CampaignBuilder() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { data: forms } = useForms();
+
   const [currentStep, setCurrentStep] = useState(1);
-  const [recipients, setRecipients] = useState<Recipient[]>([
-    { name: "Sarah Johnson", phone: "+1234567890", company: "TechStart Inc" },
-    { name: "Michael Chen", phone: "+1987654321", company: "Growth Labs" },
-    { name: "Emily Rodriguez", phone: "+1555555555", company: "Bloom Agency" },
-  ]);
-  const [message, setMessage] = useState(messageTemplates[0].preview);
-  const [selectedTemplate, setSelectedTemplate] = useState("friendly");
-  const [timing, setTiming] = useState<"now" | "scheduled" | "optimal">("now");
+
+  // Step 1 - Setup
+  const [campaignName, setCampaignName] = useState("");
+  const [selectedFormId, setSelectedFormId] = useState("");
+
+  // Step 2 - Message
+  const [message, setMessage] = useState(
+    "Hey {first_name}! 👋 Quick favor - would you share your experience with us? Takes 60 sec: {form_link}"
+  );
+
+  // Step 3 - Recipients
+  const [recipientsText, setRecipientsText] = useState("");
+
+  // Step 4 - Schedule
+  const [timing, setTiming] = useState<"now" | "scheduled">("now");
   const [scheduledDate, setScheduledDate] = useState("");
-  const [followUp, setFollowUp] = useState(true);
-  const [followUpDays, setFollowUpDays] = useState(3);
-  const [selectedForm, setSelectedForm] = useState("customer-success");
 
-  const handleNext = () => {
-    if (currentStep < 5) setCurrentStep(currentStep + 1);
+  // Sending state
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [sendProgress, setSendProgress] = useState({ current: 0, total: 0 });
+
+  const validNumbers = parsePhoneNumbers(recipientsText);
+  const selectedForm = forms?.find((f) => f.id === selectedFormId);
+  const formLink = selectedForm
+    ? `${window.location.origin}/collect/${selectedForm.slug}`
+    : "{form_link}";
+
+  const previewMessage = message
+    .replace("{first_name}", "Sarah")
+    .replace("{form_link}", formLink);
+
+  const insertVariable = (v: string) => {
+    setMessage((prev) => prev + v);
   };
 
-  const handleBack = () => {
-    if (currentStep > 1) setCurrentStep(currentStep - 1);
+  const canProceed = () => {
+    switch (currentStep) {
+      case 1: return campaignName.trim().length > 0 && selectedFormId.length > 0;
+      case 2: return message.trim().length > 0;
+      case 3: return validNumbers.length > 0;
+      case 4: return timing === "now" || (timing === "scheduled" && scheduledDate);
+      default: return true;
+    }
   };
 
-  const handleSend = () => {
-    toast({
-      title: "Campaign sent! 🚀",
-      description: `SMS sent to ${recipients.length} recipients`,
-    });
-    navigate("/dashboard/campaigns");
+  const saveCampaign = async (status: "draft" | "active" | "scheduled") => {
+    if (!user) return null;
+    const { data, error } = await supabase
+      .from("campaigns")
+      .insert({
+        user_id: user.id,
+        name: campaignName,
+        form_id: selectedFormId || null,
+        type: "sms" as const,
+        status,
+        message_template: message,
+        recipients: validNumbers.map((p) => ({ phone: p })),
+        total_recipients: validNumbers.length,
+        scheduled_at: timing === "scheduled" ? scheduledDate : null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  };
+
+  const handleSaveDraft = async () => {
+    setIsSaving(true);
+    try {
+      await saveCampaign("draft");
+      toast({ title: "Campaign saved as draft" });
+      navigate("/dashboard/campaigns");
+    } catch (e: any) {
+      toast({ title: "Failed to save", description: e.message, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSend = async () => {
+    setIsSending(true);
+    try {
+      const campaign = await saveCampaign(timing === "scheduled" ? "scheduled" : "active");
+      if (!campaign) throw new Error("Failed to create campaign");
+
+      if (timing === "now") {
+        const total = validNumbers.length;
+        setSendProgress({ current: 0, total });
+
+        for (let i = 0; i < total; i++) {
+          const phone = validNumbers[i];
+          const personalizedMsg = message
+            .replace("{first_name}", "")
+            .replace("{form_link}", formLink);
+
+          await supabase.functions.invoke("send-sms", {
+            body: { to: phone, message: personalizedMsg, campaign_id: campaign.id },
+          });
+          setSendProgress({ current: i + 1, total });
+        }
+
+        // Update campaign stats
+        await supabase
+          .from("campaigns")
+          .update({ sent_count: total, status: "active" as const })
+          .eq("id", campaign.id);
+      }
+
+      toast({
+        title: timing === "now" ? "Campaign sent! 🚀" : "Campaign scheduled! 📅",
+        description:
+          timing === "now"
+            ? `SMS sent to ${validNumbers.length} recipients`
+            : `Scheduled for ${new Date(scheduledDate).toLocaleString()}`,
+      });
+      navigate("/dashboard/campaigns");
+    } catch (e: any) {
+      toast({ title: "Failed to send", description: e.message, variant: "destructive" });
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="border-b border-border bg-card sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard/campaigns")}>
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              Back
+              <ArrowLeft className="w-4 h-4 mr-1" /> Back
             </Button>
             <h1 className="text-xl font-semibold text-foreground">New SMS Campaign</h1>
           </div>
+          <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={isSaving || !campaignName.trim()}>
+            {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            Save Draft
+          </Button>
         </div>
       </div>
 
-      {/* Progress Steps */}
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className="max-w-3xl mx-auto px-4 py-6">
+        {/* Progress */}
         <div className="flex items-center justify-between mb-8">
           {steps.map((step, index) => (
             <div key={step.id} className="flex items-center">
-              <div
-                className={`flex items-center justify-center w-10 h-10 rounded-full ${
+              <button
+                onClick={() => setCurrentStep(step.id)}
+                className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors ${
                   currentStep >= step.id
-                    ? "gradient-sunny text-white"
+                    ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground"
                 }`}
               >
                 <step.icon className="w-5 h-5" />
-              </div>
+              </button>
               <span className={`ml-2 text-sm font-medium hidden sm:block ${
                 currentStep >= step.id ? "text-foreground" : "text-muted-foreground"
               }`}>
@@ -118,48 +213,87 @@ export default function CampaignBuilder() {
           ))}
         </div>
 
-        {/* Step Content */}
+        {/* Sending overlay */}
+        {isSending && (
+          <div className="fixed inset-0 z-50 bg-background/80 flex items-center justify-center">
+            <Card className="w-full max-w-sm">
+              <CardContent className="p-8 text-center space-y-4">
+                <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
+                <h3 className="text-lg font-semibold text-foreground">
+                  Sending {sendProgress.current}/{sendProgress.total}...
+                </h3>
+                <Progress value={(sendProgress.current / Math.max(sendProgress.total, 1)) * 100} className="h-2" />
+                <p className="text-sm text-muted-foreground">Please don't close this page</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         <Card className="bg-card border border-border rounded-2xl">
           <CardContent className="p-8">
-            {/* Step 1: Recipients */}
+            {/* Step 1: Setup */}
             {currentStep === 1 && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Who's receiving this?</h2>
-                  <p className="text-muted-foreground">Import your contacts or add them manually</p>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">Campaign Setup</h2>
+                  <p className="text-muted-foreground">Name your campaign and select a form</p>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                  <Card className="border-2 border-dashed border-border hover:border-primary cursor-pointer transition-all p-6 text-center">
-                    <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                    <span className="text-sm font-medium">Import CSV</span>
-                  </Card>
-                  <Card className="border-2 border-dashed border-border hover:border-primary cursor-pointer transition-all p-6 text-center">
-                    <div className="text-2xl mb-2">🔗</div>
-                    <span className="text-sm font-medium">Connect CRM</span>
-                  </Card>
-                  <Card className="border-2 border-dashed border-border hover:border-primary cursor-pointer transition-all p-6 text-center">
-                    <div className="text-2xl mb-2">✏️</div>
-                    <span className="text-sm font-medium">Manual Entry</span>
-                  </Card>
-                </div>
-
-                {/* Recipients List */}
-                <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="p-4 bg-muted/50 border-b border-border flex justify-between items-center">
-                    <span className="font-medium">{recipients.length} recipients</span>
-                    <Button variant="outline" size="sm">+ Add</Button>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Campaign Name</Label>
+                    <Input
+                      value={campaignName}
+                      onChange={(e) => setCampaignName(e.target.value)}
+                      placeholder="e.g. Q1 Customer Check-in"
+                      className="mt-1"
+                    />
                   </div>
-                  <div className="divide-y divide-border max-h-64 overflow-y-auto">
-                    {recipients.map((r, i) => (
-                      <div key={i} className="p-4 flex items-center justify-between">
-                        <div>
-                          <div className="font-medium text-foreground">{r.name}</div>
-                          <div className="text-sm text-muted-foreground">{r.company}</div>
-                        </div>
-                        <div className="text-sm text-muted-foreground">{r.phone}</div>
-                      </div>
-                    ))}
+
+                  <div>
+                    <Label>Linked Form</Label>
+                    <p className="text-sm text-muted-foreground mb-2">Which form should recipients complete?</p>
+                    <div className="space-y-2">
+                      {(forms ?? []).map((form) => (
+                        <Card
+                          key={form.id}
+                          onClick={() => setSelectedFormId(form.id)}
+                          className={`cursor-pointer transition-all ${
+                            selectedFormId === form.id
+                              ? "border-primary ring-2 ring-primary/20"
+                              : "border-border hover:border-border"
+                          }`}
+                        >
+                          <CardContent className="p-4 flex items-center justify-between">
+                            <div>
+                              <div className="font-medium text-foreground">{form.name}</div>
+                              <div className="text-sm text-muted-foreground">{form.submission_count ?? 0} responses</div>
+                            </div>
+                            {selectedFormId === form.id && (
+                              <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                                <Check className="w-4 h-4 text-primary-foreground" />
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                      {(forms ?? []).length === 0 && (
+                        <p className="text-sm text-muted-foreground py-4 text-center">
+                          No forms yet.{" "}
+                          <button className="text-primary underline" onClick={() => navigate("/dashboard/forms/new/edit")}>
+                            Create one first
+                          </button>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Campaign Type</Label>
+                    <div className="flex gap-3 mt-1">
+                      <Badge className="bg-primary text-primary-foreground">SMS</Badge>
+                      <Badge variant="outline" className="text-muted-foreground">Email <span className="text-xs ml-1 opacity-60">coming soon</span></Badge>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -170,68 +304,84 @@ export default function CampaignBuilder() {
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Craft your message</h2>
-                  <p className="text-muted-foreground">Choose a template or write your own</p>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  {messageTemplates.map((template) => (
-                    <Card
-                      key={template.id}
-                      onClick={() => {
-                        setSelectedTemplate(template.id);
-                        setMessage(template.preview);
-                      }}
-                      className={`cursor-pointer transition-all ${
-                        selectedTemplate === template.id
-                          ? "border-primary ring-2 ring-primary/20"
-                          : "border-border hover:border-border-hover"
-                      }`}
-                    >
-                      <CardContent className="p-4">
-                        <div className="font-medium text-foreground mb-2">{template.name}</div>
-                        <p className="text-xs text-muted-foreground line-clamp-3">{template.preview}</p>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  <p className="text-muted-foreground">Write your SMS with a {SMS_CHAR_LIMIT} character limit</p>
                 </div>
 
                 <div>
-                  <Label>Message</Label>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Message</Label>
+                    <span className={`text-sm ${message.length > SMS_CHAR_LIMIT ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                      {message.length}/{SMS_CHAR_LIMIT}
+                    </span>
+                  </div>
                   <Textarea
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     rows={4}
-                    className="mt-2"
+                    maxLength={SMS_CHAR_LIMIT * 2}
+                    className="resize-none"
                   />
-                  <div className="flex justify-between text-sm text-muted-foreground mt-2">
-                    <span>Variables: {"{name}"}, {"{company}"}, {"{link}"}</span>
-                    <span>{message.length} characters</span>
+                  <div className="flex gap-2 mt-2">
+                    <Button variant="outline" size="sm" onClick={() => insertVariable("{first_name}")}>
+                      + {"{first_name}"}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => insertVariable("{form_link}")}>
+                      + {"{form_link}"}
+                    </Button>
                   </div>
                 </div>
 
-                {/* Phone Preview */}
+                {/* Phone preview */}
                 <div className="flex justify-center">
-                  <div className="w-64 bg-foreground/5 rounded-3xl p-4 border-4 border-foreground/10">
-                    <div className="bg-card rounded-2xl p-4 shadow-sm">
-                      <div className="text-xs text-muted-foreground mb-2">SMS Preview</div>
-                      <p className="text-sm text-foreground">
-                        {message.replace("{name}", "Sarah").replace("{link}", "yoursite.com/c/abc")}
-                      </p>
+                  <div className="w-64 rounded-3xl p-4 border-4 border-border bg-muted/30">
+                    <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
+                      <Smartphone className="w-3 h-3" />
+                      SMS Preview
+                    </div>
+                    <div className="bg-card rounded-2xl p-4 shadow-sm border">
+                      <p className="text-sm text-foreground whitespace-pre-wrap break-words">{previewMessage}</p>
                     </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Step 3: Timing */}
+            {/* Step 3: Recipients */}
             {currentStep === 3 && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">When should we send it?</h2>
-                  <p className="text-muted-foreground">Choose the best time for your campaign</p>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">Add recipients</h2>
+                  <p className="text-muted-foreground">Enter phone numbers, one per line or comma-separated</p>
                 </div>
 
-                <RadioGroup value={timing} onValueChange={(v) => setTiming(v as any)}>
+                <div>
+                  <Label>Phone Numbers</Label>
+                  <Textarea
+                    value={recipientsText}
+                    onChange={(e) => setRecipientsText(e.target.value)}
+                    rows={8}
+                    placeholder={"+1234567890\n+1987654321\nor comma-separated: +1555000111, +1555000222"}
+                    className="mt-1 font-mono text-sm resize-none"
+                  />
+                  <div className="flex items-center justify-between mt-2 text-sm">
+                    <span className="text-muted-foreground">Must start with + or be 10+ digits</span>
+                    <Badge variant={validNumbers.length > 0 ? "default" : "secondary"}>
+                      {validNumbers.length} valid number{validNumbers.length !== 1 ? "s" : ""}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: Schedule */}
+            {currentStep === 4 && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">When should we send?</h2>
+                  <p className="text-muted-foreground">Choose when to deliver your campaign</p>
+                </div>
+
+                <RadioGroup value={timing} onValueChange={(v) => setTiming(v as "now" | "scheduled")}>
                   <div className="space-y-3">
                     <Card className={`cursor-pointer ${timing === "now" ? "border-primary" : "border-border"}`}>
                       <CardContent className="p-4 flex items-center gap-4">
@@ -259,155 +409,59 @@ export default function CampaignBuilder() {
                         )}
                       </CardContent>
                     </Card>
-                    <Card className={`cursor-pointer ${timing === "optimal" ? "border-primary" : "border-border"}`}>
-                      <CardContent className="p-4 flex items-center gap-4">
-                        <RadioGroupItem value="optimal" id="optimal" />
-                        <Label htmlFor="optimal" className="flex-1 cursor-pointer">
-                          <div className="font-medium flex items-center gap-2">
-                            Optimal time
-                            <Badge className="bg-primary/10 text-primary border-0">AI ✨</Badge>
-                          </div>
-                          <div className="text-sm text-muted-foreground">AI picks the best time based on your audience</div>
-                        </Label>
-                      </CardContent>
-                    </Card>
                   </div>
                 </RadioGroup>
 
-                <Card className="border-border">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <Label className="font-medium">Auto-remind non-responders</Label>
-                      <input
-                        type="checkbox"
-                        checked={followUp}
-                        onChange={(e) => setFollowUp(e.target.checked)}
-                        className="w-5 h-5"
-                      />
+                {/* Review summary */}
+                <div className="mt-6 space-y-3">
+                  <h3 className="font-semibold text-foreground">Review</h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between p-3 bg-muted/50 rounded-xl text-sm">
+                      <span className="text-muted-foreground">Campaign</span>
+                      <span className="font-medium text-foreground">{campaignName}</span>
                     </div>
-                    {followUp && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">Remind after</span>
-                        <Input
-                          type="number"
-                          value={followUpDays}
-                          onChange={(e) => setFollowUpDays(parseInt(e.target.value))}
-                          className="w-20"
-                          min={1}
-                          max={14}
-                        />
-                        <span className="text-sm text-muted-foreground">days</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-
-            {/* Step 4: Form */}
-            {currentStep === 4 && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Link to a form</h2>
-                  <p className="text-muted-foreground">Which form should recipients complete?</p>
-                </div>
-
-                <div className="space-y-3">
-                  {[
-                    { id: "customer-success", name: "Customer Success Story", responses: 47 },
-                    { id: "quick-feedback", name: "Quick Feedback", responses: 128 },
-                    { id: "video-testimonials", name: "Video Testimonials", responses: 23 },
-                  ].map((form) => (
-                    <Card
-                      key={form.id}
-                      onClick={() => setSelectedForm(form.id)}
-                      className={`cursor-pointer transition-all ${
-                        selectedForm === form.id
-                          ? "border-primary ring-2 ring-primary/20"
-                          : "border-border hover:border-border-hover"
-                      }`}
-                    >
-                      <CardContent className="p-4 flex items-center justify-between">
-                        <div>
-                          <div className="font-medium text-foreground">{form.name}</div>
-                          <div className="text-sm text-muted-foreground">{form.responses} responses</div>
-                        </div>
-                        {selectedForm === form.id && (
-                          <div className="w-6 h-6 rounded-full gradient-sunny flex items-center justify-center">
-                            <Check className="w-4 h-4 text-white" />
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-
-                <Button variant="outline" className="w-full" onClick={() => navigate("/dashboard/forms/new/edit")}>
-                  + Create new form
-                </Button>
-              </div>
-            )}
-
-            {/* Step 5: Review */}
-            {currentStep === 5 && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Ready to send? 🚀</h2>
-                  <p className="text-muted-foreground">Review your campaign before sending</p>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex justify-between p-4 bg-muted/50 rounded-xl">
-                    <span className="text-muted-foreground">Recipients</span>
-                    <span className="font-medium">{recipients.length} contacts</span>
-                  </div>
-                  <div className="flex justify-between p-4 bg-muted/50 rounded-xl">
-                    <span className="text-muted-foreground">Timing</span>
-                    <span className="font-medium">
-                      {timing === "now" ? "Send immediately" : timing === "optimal" ? "AI-optimized" : scheduledDate}
-                    </span>
-                  </div>
-                  <div className="flex justify-between p-4 bg-muted/50 rounded-xl">
-                    <span className="text-muted-foreground">Form</span>
-                    <span className="font-medium">{selectedForm}</span>
-                  </div>
-                  <div className="flex justify-between p-4 bg-muted/50 rounded-xl">
-                    <span className="text-muted-foreground">Follow-up</span>
-                    <span className="font-medium">{followUp ? `After ${followUpDays} days` : "Disabled"}</span>
-                  </div>
-                  <div className="flex justify-between p-4 bg-gold-light rounded-xl">
-                    <span className="text-foreground font-medium">SMS Credits</span>
-                    <span className="font-bold text-foreground">{recipients.length} credits</span>
+                    <div className="flex justify-between p-3 bg-muted/50 rounded-xl text-sm">
+                      <span className="text-muted-foreground">Form</span>
+                      <span className="font-medium text-foreground">{selectedForm?.name ?? "—"}</span>
+                    </div>
+                    <div className="flex justify-between p-3 bg-muted/50 rounded-xl text-sm">
+                      <span className="text-muted-foreground">Recipients</span>
+                      <span className="font-medium text-foreground">{validNumbers.length} contacts</span>
+                    </div>
+                    <div className="flex justify-between p-3 bg-warning/10 rounded-xl text-sm">
+                      <span className="font-medium text-foreground">SMS Credits</span>
+                      <span className="font-bold text-foreground">{validNumbers.length} credits</span>
+                    </div>
                   </div>
                 </div>
-
-                <Button
-                  className="w-full h-14 text-lg gradient-sunny text-white border-0 shadow-warm-lg"
-                  onClick={handleSend}
-                >
-                  <Send className="w-5 h-5 mr-2" />
-                  Send Campaign 🚀
-                </Button>
               </div>
             )}
 
             {/* Navigation */}
-            {currentStep < 5 && (
-              <div className="flex justify-between mt-8">
-                <Button
-                  variant="outline"
-                  onClick={handleBack}
-                  disabled={currentStep === 1}
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back
+            <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
+              <Button
+                variant="ghost"
+                onClick={() => setCurrentStep((s) => s - 1)}
+                disabled={currentStep === 1}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" /> Back
+              </Button>
+
+              {currentStep < 4 ? (
+                <Button onClick={() => setCurrentStep((s) => s + 1)} disabled={!canProceed()}>
+                  Next <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
-                <Button onClick={handleNext} className="gradient-sunny text-white border-0">
-                  Continue
-                  <ArrowRight className="w-4 h-4 ml-2" />
+              ) : (
+                <Button onClick={handleSend} disabled={!canProceed() || isSending}>
+                  {isSending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4 mr-2" />
+                  )}
+                  {timing === "now" ? "Send Campaign" : "Schedule Campaign"}
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
