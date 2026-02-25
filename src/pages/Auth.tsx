@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { lovable } from "@/integrations/lovable/index";
@@ -27,10 +27,13 @@ export default function Auth() {
   const [isMagicLinkLoading, setIsMagicLinkLoading] = useState(false);
   const [magicLinkMode, setMagicLinkMode] = useState(false);
 
-  if (user) {
-    navigate("/dashboard", { replace: true });
-    return null;
-  }
+  useEffect(() => {
+    if (user) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [user, navigate]);
+
+  if (user) return null;
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
