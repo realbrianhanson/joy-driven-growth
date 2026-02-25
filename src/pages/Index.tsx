@@ -12,6 +12,9 @@ import {
   Repeat,
   Quote,
 } from "lucide-react";
+import featureCollect from "@/assets/feature-collect.jpg";
+import featureRevenue from "@/assets/feature-revenue.jpg";
+import featureContent from "@/assets/feature-content.jpg";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -192,16 +195,19 @@ const features = [
     icon: Sparkles,
     title: "AI-Powered Interviews",
     desc: "Our AI conducts follow-up interviews to extract deeper, more compelling stories from your happiest clients.",
+    image: featureCollect,
   },
   {
     icon: DollarSign,
     title: "Revenue Attribution",
     desc: "Tag testimonials to deals. Know which story closed which client. Finally, social proof with an ROI.",
+    image: featureRevenue,
   },
   {
     icon: Repeat,
     title: "Content Studio",
     desc: "Turn one testimonial into social posts, case study snippets, and ad copy — automatically.",
+    image: featureContent,
   },
 ];
 
@@ -230,7 +236,7 @@ const FeatureShowcase = () => (
               <p className="mt-3 text-muted-foreground text-lg leading-relaxed">{f.desc}</p>
             </div>
             <div className="flex-1 w-full">
-              <div className="aspect-[4/3] rounded-xl border border-border bg-muted/50" />
+              <img src={f.image} alt={f.title} className="aspect-[4/3] rounded-xl border border-border bg-muted/50 object-cover w-full" />
             </div>
           </motion.div>
         ))}
