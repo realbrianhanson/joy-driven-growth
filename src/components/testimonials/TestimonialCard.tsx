@@ -180,14 +180,14 @@ export function TestimonialCard({
           <div className="flex flex-wrap items-center gap-2 mb-3">
             {/* Sentiment */}
             <Badge variant="secondary" className="text-xs">
-              {sentimentConfig[testimonial.sentiment].emoji}{" "}
-              {sentimentConfig[testimonial.sentiment].label}
+            {(sentimentConfig[testimonial.sentiment] ?? sentimentConfig.neutral).emoji}{" "}
+            {(sentimentConfig[testimonial.sentiment] ?? sentimentConfig.neutral).label}
             </Badge>
             
             {/* Source */}
             <Badge variant="outline" className="text-xs">
-              {sourceConfig[testimonial.source].emoji}{" "}
-              {sourceConfig[testimonial.source].label}
+            {(sourceConfig[testimonial.source] ?? sourceConfig.form).emoji}{" "}
+            {(sourceConfig[testimonial.source] ?? sourceConfig.form).label}
             </Badge>
 
             {/* Revenue */}

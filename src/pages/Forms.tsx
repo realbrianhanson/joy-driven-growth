@@ -37,8 +37,23 @@ export default function Forms() {
   const loading = isDemoMode ? false : isLoading;
 
   // Map DB forms to display shape
+  const mapForm = (f: any) => ({
+        id: f.id,
+        name: f.name,
+        slug: f.slug,
+        status: (f.is_published ?? f.status === "active") ? ("active" as const) : ("inactive" as const),
+        types: f.types ?? [
+          ...(f.collect_text ? ["text" as const] : []),
+          ...(f.collect_video ? ["video" as const] : []),
+          ...(f.collect_audio ? ["audio" as const] : []),
+        ],
+        submissions: f.submission_count ?? 0,
+        primaryColor: f.primary_color ?? "#6366F1",
+        createdAt: f.created_at,
+  });
+
   const forms = isDemoMode
-    ? MOCK_FORMS
+    ? MOCK_FORMS.map(mapForm)
     : (realForms ?? []).map((f) => ({
         id: f.id,
         name: f.name,
