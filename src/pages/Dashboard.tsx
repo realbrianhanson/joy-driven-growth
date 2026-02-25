@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { useDemoMode } from "@/contexts/DemoModeContext";
 import { useDashboard } from "@/hooks/use-dashboard";
@@ -17,6 +18,7 @@ import { QuickActions } from "@/components/dashboard/QuickActions";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
 import { AiInsights } from "@/components/dashboard/AiInsights";
 import { RevenueDrivers } from "@/components/dashboard/RevenueDrivers";
+import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
@@ -92,13 +94,21 @@ export default function Dashboard() {
   const hasTestimonials = isDemoMode ? true : real.hasTestimonials;
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8">
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className="max-w-6xl mx-auto px-6 py-8"
+    >
       <WelcomeHeader
         name={firstName}
         weeklyRevenue={weeklyRevenue}
         hasTestimonials={hasTestimonials}
         isNewUser={!isDemoMode && !hasTestimonials}
       />
+
+      {/* Onboarding checklist for new users */}
+      {!isDemoMode && <OnboardingChecklist />}
 
       {/* Revenue hero */}
       {isLoading ? (
@@ -128,7 +138,7 @@ export default function Dashboard() {
         <div className="mb-6"><FeedSkeleton /></div>
       ) : drivers.length > 0 ? (
         <div className="mb-6"><RevenueDrivers drivers={drivers} /></div>
-      ) : !isDemoMode && hasTestimonials ? null : !isDemoMode ? null : null}
+      ) : null}
 
       {/* Recent testimonials */}
       {isLoading ? (
@@ -175,6 +185,6 @@ export default function Dashboard() {
           {insights.length > 0 && <AiInsights insights={insights} />}
         </div>
       ) : null}
-    </div>
+    </motion.div>
   );
 }

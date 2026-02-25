@@ -80,9 +80,7 @@ export default function Campaigns() {
                 Back
               </Button>
             </div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-              SMS Campaigns <span>📱</span>
-            </h1>
+            <h1 className="text-3xl font-bold text-foreground">SMS Campaigns</h1>
             <p className="text-muted-foreground">98% open rate. 3x more testimonials.</p>
           </div>
           <Button onClick={() => navigate("/dashboard/campaigns/new")}>

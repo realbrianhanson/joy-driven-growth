@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,35 +7,44 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import Testimonials from "./pages/Testimonials";
-import Forms from "./pages/Forms";
-import FormBuilder from "./pages/FormBuilder";
-import Campaigns from "./pages/Campaigns";
-import CampaignBuilder from "./pages/CampaignBuilder";
-import AiInterview from "./pages/AiInterview";
-import PublicForm from "./pages/PublicForm";
-import Widgets from "./pages/Widgets";
-import WidgetBuilder from "./pages/WidgetBuilder";
-import WallOfLove from "./pages/WallOfLove";
-import WallBuilder from "./pages/WallBuilder";
-import ContentStudio from "./pages/ContentStudio";
-import ContentLibrary from "./pages/ContentLibrary";
-import VideoEditor from "./pages/VideoEditor";
-import Analytics from "./pages/Analytics";
-import SettingsGeneral from "./pages/SettingsGeneral";
-import SettingsTeam from "./pages/SettingsTeam";
-import SettingsIntegrations from "./pages/SettingsIntegrations";
-import SettingsBilling from "./pages/SettingsBilling";
-import SettingsApi from "./pages/SettingsApi";
-import AgencyDashboard from "./pages/AgencyDashboard";
-import ChromeExtension from "./pages/ChromeExtension";
-import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
+// Lazy-loaded pages
+const Auth = lazy(() => import("./pages/Auth"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Testimonials = lazy(() => import("./pages/Testimonials"));
+const Forms = lazy(() => import("./pages/Forms"));
+const FormBuilder = lazy(() => import("./pages/FormBuilder"));
+const Campaigns = lazy(() => import("./pages/Campaigns"));
+const CampaignBuilder = lazy(() => import("./pages/CampaignBuilder"));
+const AiInterview = lazy(() => import("./pages/AiInterview"));
+const PublicForm = lazy(() => import("./pages/PublicForm"));
+const Widgets = lazy(() => import("./pages/Widgets"));
+const WidgetBuilder = lazy(() => import("./pages/WidgetBuilder"));
+const WallOfLove = lazy(() => import("./pages/WallOfLove"));
+const WallBuilder = lazy(() => import("./pages/WallBuilder"));
+const ContentStudio = lazy(() => import("./pages/ContentStudio"));
+const ContentLibrary = lazy(() => import("./pages/ContentLibrary"));
+const VideoEditor = lazy(() => import("./pages/VideoEditor"));
+const Analytics = lazy(() => import("./pages/Analytics"));
+const SettingsGeneral = lazy(() => import("./pages/SettingsGeneral"));
+const SettingsTeam = lazy(() => import("./pages/SettingsTeam"));
+const SettingsIntegrations = lazy(() => import("./pages/SettingsIntegrations"));
+const SettingsBilling = lazy(() => import("./pages/SettingsBilling"));
+const SettingsApi = lazy(() => import("./pages/SettingsApi"));
+const AgencyDashboard = lazy(() => import("./pages/AgencyDashboard"));
+const ChromeExtension = lazy(() => import("./pages/ChromeExtension"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+
 const queryClient = new QueryClient();
+
+const PageLoader = () => (
+  <div className="min-h-[400px] flex items-center justify-center">
+    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+  </div>
+);
 
 const RootRedirect = () => {
   const { user, isLoading } = useAuth();
@@ -50,7 +60,13 @@ const RootRedirect = () => {
 
 const DashboardRoute = ({ children }: { children: React.ReactNode }) => (
   <ProtectedRoute>
-    <DashboardLayout>{children}</DashboardLayout>
+    <DashboardLayout>
+      <ErrorBoundary>
+        <Suspense fallback={<PageLoader />}>
+          {children}
+        </Suspense>
+      </ErrorBoundary>
+    </DashboardLayout>
   </ProtectedRoute>
 );
 
@@ -62,9 +78,9 @@ const AnimatedRoutes = () => {
       <Routes location={location} key={location.pathname}>
         {/* Public routes */}
         <Route path="/" element={<RootRedirect />} />
-        <Route path="/login" element={<Auth />} />
-        <Route path="/collect/:slug" element={<PublicForm />} />
-        <Route path="/collect/:slug/ai" element={<AiInterview />} />
+        <Route path="/login" element={<Suspense fallback={<PageLoader />}><Auth /></Suspense>} />
+        <Route path="/collect/:slug" element={<Suspense fallback={<PageLoader />}><PublicForm /></Suspense>} />
+        <Route path="/collect/:slug/ai" element={<Suspense fallback={<PageLoader />}><AiInterview /></Suspense>} />
 
         {/* Dashboard routes - protected + layout */}
         <Route path="/dashboard" element={<DashboardRoute><Dashboard /></DashboardRoute>} />
@@ -90,7 +106,7 @@ const AnimatedRoutes = () => {
         <Route path="/dashboard/agency" element={<DashboardRoute><AgencyDashboard /></DashboardRoute>} />
         <Route path="/dashboard/extension" element={<DashboardRoute><ChromeExtension /></DashboardRoute>} />
 
-        <Route path="*" element={<NotFound />} />
+        <Route path="*" element={<Suspense fallback={<PageLoader />}><NotFound /></Suspense>} />
       </Routes>
     </AnimatePresence>
   );
@@ -99,11 +115,13 @@ const AnimatedRoutes = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AnimatedRoutes />
-      </BrowserRouter>
+      <ErrorBoundary>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AnimatedRoutes />
+        </BrowserRouter>
+      </ErrorBoundary>
     </TooltipProvider>
   </QueryClientProvider>
 );
