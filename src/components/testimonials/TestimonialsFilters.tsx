@@ -142,30 +142,27 @@ export function TestimonialsFilters({
         </div>
       </div>
 
-      {/* Filter Pills */}
-      <div className="flex flex-wrap gap-2">
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-1 border-b border-border">
         {filterConfig.map((filter) => (
           <button
             key={filter.key}
             onClick={() => onFilterChange(filter.key)}
-            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+            className={`relative inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors ${
               activeFilter === filter.key
-                ? "gradient-sunny text-white shadow-warm"
-                : "bg-card border border-border hover:border-primary/50 text-foreground"
+                ? "text-primary"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {filter.icon && <span>{filter.icon}</span>}
             {filter.label}
-            <Badge 
-              variant="secondary" 
-              className={`ml-1 text-xs px-1.5 py-0 ${
-                activeFilter === filter.key 
-                  ? "bg-white/20 text-white" 
-                  : "bg-muted"
-              }`}
-            >
+            <span className={`text-xs tabular-nums ${
+              activeFilter === filter.key ? "text-primary" : "text-muted-foreground"
+            }`}>
               {counts[filter.key]}
-            </Badge>
+            </span>
+            {activeFilter === filter.key && (
+              <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary rounded-full" />
+            )}
           </button>
         ))}
       </div>
