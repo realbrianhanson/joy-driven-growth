@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
-import { useAuth } from "@/hooks/use-auth";
+
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -46,17 +46,7 @@ const PageLoader = () => (
   </div>
 );
 
-const RootRedirect = () => {
-  const { user, isLoading } = useAuth();
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-  return <Navigate to={user ? "/dashboard" : "/login"} replace />;
-};
+const Index = lazy(() => import("./pages/Index"));
 
 const DashboardRoute = ({ children }: { children: React.ReactNode }) => (
   <ProtectedRoute>
@@ -77,7 +67,7 @@ const AnimatedRoutes = () => {
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         {/* Public routes */}
-        <Route path="/" element={<RootRedirect />} />
+        <Route path="/" element={<Suspense fallback={<PageLoader />}><Index /></Suspense>} />
         <Route path="/login" element={<Suspense fallback={<PageLoader />}><Auth /></Suspense>} />
         <Route path="/collect/:slug" element={<Suspense fallback={<PageLoader />}><PublicForm /></Suspense>} />
         <Route path="/collect/:slug/ai" element={<Suspense fallback={<PageLoader />}><AiInterview /></Suspense>} />
