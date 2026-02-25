@@ -1,115 +1,135 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
-  Building2, 
-  Palette, 
-  Globe, 
-  Bell,
-  Save,
-  Upload,
-  Check,
-  Eye
+  Building2, Palette, Globe, Bell, Save, Upload, Eye, Loader2
 } from "lucide-react";
 import { useDemoMode } from "@/contexts/DemoModeContext";
+import { useAuth } from "@/hooks/use-auth";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import SettingsLayout from "@/components/settings/SettingsLayout";
 
 const SettingsGeneral = () => {
   const { isDemoMode, toggleDemoMode } = useDemoMode();
+  const { user, profile, updateProfile } = useAuth();
   const [demoConfirmOpen, setDemoConfirmOpen] = useState(false);
-  const [orgName, setOrgName] = useState("Acme Corp");
-  const [urlSlug, setUrlSlug] = useState("acme-corp");
-  const [industry, setIndustry] = useState("saas");
-  const [primaryColor, setPrimaryColor] = useState("#F97316");
-  const [language, setLanguage] = useState("en");
-  const [videoLength, setVideoLength] = useState("120");
-  const [autoApprove, setAutoApprove] = useState(false);
-  const [notifications, setNotifications] = useState({
-    newTestimonial: true,
-    weeklyDigest: true,
-    revenueAlerts: true,
-  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSave = () => {
-    toast.success("Settings saved successfully! ✨");
+  const [fullName, setFullName] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [timezone, setTimezone] = useState("UTC");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || "");
+      setCompanyName(profile.company_name || "");
+      setIndustry(profile.industry || "");
+      setTimezone(profile.timezone || "UTC");
+      setAvatarUrl(profile.avatar_url);
+    }
+  }, [profile]);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setIsUploading(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `${user.id}/avatar.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
+      setAvatarUrl(publicUrl);
+      await updateProfile({ avatar_url: publicUrl });
+      toast.success('Avatar updated!');
+    } catch (err) {
+      toast.error('Failed to upload avatar');
+      console.error(err);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    const { error } = await updateProfile({
+      full_name: fullName,
+      company_name: companyName,
+      industry,
+      timezone,
+    });
+    setIsSaving(false);
+    if (error) {
+      toast.error("Failed to save settings");
+    } else {
+      toast.success("Settings saved successfully! ✨");
+    }
   };
 
   return (
     <SettingsLayout>
       <div className="space-y-6">
-        {/* Organization */}
+        {/* Profile */}
         <Card className="bg-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-primary" />
-              Organization
+              <Building2 className="w-5 h-5 text-primary" />Profile
             </CardTitle>
-            <CardDescription>Basic information about your organization</CardDescription>
+            <CardDescription>Your personal and organization information</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
+            {/* Avatar */}
+            <div className="flex items-center gap-4">
+              <Avatar className="h-16 w-16">
+                <AvatarImage src={avatarUrl || undefined} />
+                <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white text-xl">
+                  {fullName?.[0] || user?.email?.[0] || '?'}
+                </AvatarFallback>
+              </Avatar>
               <div>
-                <Label htmlFor="orgName">Organization Name</Label>
-                <Input
-                  id="orgName"
-                  value={orgName}
-                  onChange={(e) => setOrgName(e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="urlSlug">URL Slug</Label>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-sm text-muted-foreground">happyclient.io/</span>
-                  <Input
-                    id="urlSlug"
-                    value={urlSlug}
-                    onChange={(e) => setUrlSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
-                  />
-                </div>
+                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAvatarUpload} />
+                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+                  {isUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                  Upload Avatar
+                </Button>
               </div>
             </div>
 
             <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <Label>Logo</Label>
-                <div className="mt-1 flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-2xl font-bold">
-                    {orgName[0]}
-                  </div>
-                  <Button variant="outline" size="sm">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Upload Logo
-                  </Button>
-                </div>
+                <Label htmlFor="fullName">Full Name</Label>
+                <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} className="mt-1" />
               </div>
+              <div>
+                <Label htmlFor="companyName">Company Name</Label>
+                <Input id="companyName" value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="mt-1" />
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="industry">Industry</Label>
                 <Select value={industry} onValueChange={setIndustry}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select industry" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="saas">SaaS</SelectItem>
                     <SelectItem value="ecommerce">E-Commerce</SelectItem>
@@ -121,130 +141,27 @@ const SettingsGeneral = () => {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Branding */}
-        <Card className="bg-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Palette className="w-5 h-5 text-primary" />
-              Branding
-            </CardTitle>
-            <CardDescription>Customize the look of your collection forms and widgets</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="primaryColor">Primary Color</Label>
-                <div className="flex items-center gap-3 mt-1">
-                  <input
-                    type="color"
-                    id="primaryColor"
-                    value={primaryColor}
-                    onChange={(e) => setPrimaryColor(e.target.value)}
-                    className="w-12 h-10 rounded-lg border border-border cursor-pointer"
-                  />
-                  <Input
-                    value={primaryColor}
-                    onChange={(e) => setPrimaryColor(e.target.value)}
-                    className="flex-1"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Custom Domain</Label>
-                <div className="flex items-center gap-2 mt-1">
-                  <Input placeholder="testimonials.yourcompany.com" disabled />
-                  <Button variant="outline" size="sm" disabled>
-                    Pro
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Upgrade to Pro for custom domains</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Defaults */}
-        <Card className="bg-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Globe className="w-5 h-5 text-primary" />
-              Defaults
-            </CardTitle>
-            <CardDescription>Default settings for forms and testimonials</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="language">Default Language</Label>
-                <Select value={language} onValueChange={setLanguage}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
+                <Label htmlFor="timezone">Timezone</Label>
+                <Select value={timezone} onValueChange={setTimezone}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="es">Spanish</SelectItem>
-                    <SelectItem value="fr">French</SelectItem>
-                    <SelectItem value="de">German</SelectItem>
-                    <SelectItem value="pt">Portuguese</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="videoLength">Max Video Length</Label>
-                <Select value={videoLength} onValueChange={setVideoLength}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="60">1 minute</SelectItem>
-                    <SelectItem value="120">2 minutes</SelectItem>
-                    <SelectItem value="180">3 minutes</SelectItem>
-                    <SelectItem value="300">5 minutes</SelectItem>
+                    <SelectItem value="UTC">UTC</SelectItem>
+                    <SelectItem value="America/New_York">Eastern (ET)</SelectItem>
+                    <SelectItem value="America/Chicago">Central (CT)</SelectItem>
+                    <SelectItem value="America/Denver">Mountain (MT)</SelectItem>
+                    <SelectItem value="America/Los_Angeles">Pacific (PT)</SelectItem>
+                    <SelectItem value="Europe/London">London (GMT)</SelectItem>
+                    <SelectItem value="Europe/Berlin">Berlin (CET)</SelectItem>
+                    <SelectItem value="Asia/Tokyo">Tokyo (JST)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <Label>Auto-approve testimonials</Label>
-                <p className="text-sm text-muted-foreground">Automatically approve 5-star testimonials</p>
-              </div>
-              <Switch checked={autoApprove} onCheckedChange={setAutoApprove} />
+            <div className="text-sm text-muted-foreground">
+              Email: {user?.email}
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Notifications */}
-        <Card className="bg-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="w-5 h-5 text-primary" />
-              Notifications
-            </CardTitle>
-            <CardDescription>Configure when and how you receive notifications</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {[
-              { key: 'newTestimonial', label: 'New testimonial received', description: 'Get notified when someone submits a testimonial' },
-              { key: 'weeklyDigest', label: 'Weekly digest', description: 'Summary of testimonials and revenue' },
-              { key: 'revenueAlerts', label: 'Revenue alerts', description: 'Get notified when revenue milestones are hit' },
-            ].map((item) => (
-              <div key={item.key} className="flex items-center justify-between py-2">
-                <div>
-                  <Label>{item.label}</Label>
-                  <p className="text-sm text-muted-foreground">{item.description}</p>
-                </div>
-                <Switch
-                  checked={notifications[item.key as keyof typeof notifications]}
-                  onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, [item.key]: checked }))}
-                />
-              </div>
-            ))}
           </CardContent>
         </Card>
 
@@ -252,15 +169,11 @@ const SettingsGeneral = () => {
         <Card className="bg-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Eye className="w-5 h-5 text-primary" />
-              Demo & Preview
+              <Eye className="w-5 h-5 text-primary" />Demo & Preview
             </CardTitle>
-            <CardDescription>
-              Show sample data to showcase the app without real client data.
-              Perfect for demos, screenshots, and onboarding walkthroughs.
-            </CardDescription>
+            <CardDescription>Show sample data for demos and screenshots.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
             <div className="flex items-center justify-between py-2">
               <div>
                 <Label>Demo Mode</Label>
@@ -271,17 +184,11 @@ const SettingsGeneral = () => {
               <Switch
                 checked={isDemoMode}
                 onCheckedChange={() => {
-                  if (isDemoMode) {
-                    setDemoConfirmOpen(true);
-                  } else {
-                    toggleDemoMode();
-                  }
+                  if (isDemoMode) setDemoConfirmOpen(true);
+                  else toggleDemoMode();
                 }}
               />
             </div>
-            <p className="text-xs text-muted-foreground">
-              Demo data is stored locally and never sent to your database.
-            </p>
           </CardContent>
         </Card>
 
@@ -289,24 +196,19 @@ const SettingsGeneral = () => {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Switch to live data?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Demo data will be hidden. Your real data will be shown.
-                You can switch back to demo mode at any time.
-              </AlertDialogDescription>
+              <AlertDialogDescription>Demo data will be hidden. You can switch back anytime.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Keep Demo Mode</AlertDialogCancel>
-              <AlertDialogAction onClick={() => { toggleDemoMode(); setDemoConfirmOpen(false); }}>
-                Switch to Live Data
-              </AlertDialogAction>
+              <AlertDialogAction onClick={() => { toggleDemoMode(); setDemoConfirmOpen(false); }}>Switch to Live Data</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Save Button */}
+        {/* Save */}
         <div className="flex justify-end">
-          <Button onClick={handleSave}>
-            <Save className="w-4 h-4 mr-2" />
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
             Save Changes
           </Button>
         </div>
