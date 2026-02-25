@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   LayoutDashboard,
   MessageSquare,
@@ -22,21 +23,25 @@ import {
   Users,
 } from "lucide-react";
 
-const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
-  { label: "Testimonials", icon: MessageSquare, path: "/dashboard/testimonials" },
-  { label: "Forms", icon: FileText, path: "/dashboard/forms" },
-  { label: "Campaigns", icon: Megaphone, path: "/dashboard/campaigns" },
-  { label: "Widgets", icon: Puzzle, path: "/dashboard/widgets" },
-  { label: "Wall of Love", icon: Heart, path: "/dashboard/walls" },
-  { label: "Content Studio", icon: Palette, path: "/dashboard/content" },
-  { label: "Analytics", icon: BarChart3, path: "/dashboard/analytics" },
-  { label: "Chrome Extension", icon: Chrome, path: "/dashboard/extension" },
-  { label: "Agency", icon: Users, path: "/dashboard/agency" },
-];
-
-const settingsItems = [
-  { label: "Settings", icon: Settings, path: "/dashboard/settings" },
+const mainNav = [
+  { section: "Collect", items: [
+    { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
+    { label: "Testimonials", icon: MessageSquare, path: "/dashboard/testimonials" },
+    { label: "Forms", icon: FileText, path: "/dashboard/forms" },
+    { label: "Campaigns", icon: Megaphone, path: "/dashboard/campaigns" },
+  ]},
+  { section: "Showcase", items: [
+    { label: "Widgets", icon: Puzzle, path: "/dashboard/widgets" },
+    { label: "Wall of Love", icon: Heart, path: "/dashboard/walls" },
+    { label: "Content Studio", icon: Palette, path: "/dashboard/content" },
+  ]},
+  { section: "Measure", items: [
+    { label: "Analytics", icon: BarChart3, path: "/dashboard/analytics" },
+  ]},
+  { section: "Tools", items: [
+    { label: "Chrome Extension", icon: Chrome, path: "/dashboard/extension" },
+    { label: "Agency", icon: Users, path: "/dashboard/agency" },
+  ]},
 ];
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
@@ -54,73 +59,91 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     navigate("/login");
   };
 
+  const initials = profile?.full_name
+    ? profile.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+    : profile?.email?.slice(0, 2).toUpperCase() ?? "U";
+
   return (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="p-6 pb-4">
-        <Link to="/dashboard" className="flex items-center gap-2" onClick={onNavigate}>
-          <span className="text-2xl">💛</span>
-          <span className="font-bold text-lg text-foreground">Happy Client</span>
-        </Link>
-        {profile?.company_name && (
-          <p className="text-xs text-muted-foreground mt-1 ml-9 truncate">{profile.company_name}</p>
-        )}
+      <div className="h-14 flex items-center gap-2.5 px-5 border-b border-border shrink-0">
+        <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
+          <span className="text-primary-foreground text-xs font-bold">T</span>
+        </div>
+        <span className="font-semibold text-foreground">Testimonial</span>
       </div>
 
-      <Separator />
-
       {/* Nav */}
-      <ScrollArea className="flex-1 px-3 py-4">
-        <nav className="space-y-1">
-          {navItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              onClick={onNavigate}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
-                isActive(item.path)
-                  ? "bg-primary/10 text-primary shadow-sm"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-
-        <Separator className="my-4" />
-
-        <nav className="space-y-1">
-          {settingsItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              onClick={onNavigate}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
-                isActive(item.path)
-                  ? "bg-primary/10 text-primary shadow-sm"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              {item.label}
-            </Link>
+      <ScrollArea className="flex-1 py-4">
+        <nav className="px-3 space-y-5">
+          {mainNav.map((group) => (
+            <div key={group.section}>
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-1 px-3">
+                {group.section}
+              </p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={onNavigate}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 h-9 text-sm font-medium transition-colors duration-150",
+                      isActive(item.path)
+                        ? "bg-primary-light text-primary font-semibold"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                  >
+                    <item.icon className="h-4 w-4 shrink-0" />
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
       </ScrollArea>
 
-      {/* Logout */}
-      <div className="p-3 border-t border-border">
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all w-full"
+      {/* Bottom */}
+      <div className="border-t border-border p-3 space-y-1">
+        <Link
+          to="/dashboard/settings"
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-3 rounded-lg px-3 h-9 text-sm font-medium transition-colors duration-150",
+            isActive("/dashboard/settings")
+              ? "bg-primary-light text-primary font-semibold"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          )}
         >
-          <LogOut className="h-4 w-4 shrink-0" />
-          Sign Out
-        </button>
+          <Settings className="h-4 w-4 shrink-0" />
+          Settings
+        </Link>
+
+        <Separator className="my-2" />
+
+        <div className="flex items-center gap-3 px-3 py-2">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="bg-primary-light text-primary text-xs font-semibold">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">
+              {profile?.full_name || "User"}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {profile?.email}
+            </p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="text-muted-foreground hover:text-destructive transition-colors"
+            title="Sign out"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -149,8 +172,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </SheetContent>
         </Sheet>
         <div className="flex items-center gap-2 ml-2">
-          <span className="text-lg">💛</span>
-          <span className="font-bold text-foreground">Happy Client</span>
+          <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center">
+            <span className="text-primary-foreground text-[10px] font-bold">T</span>
+          </div>
+          <span className="font-semibold text-foreground text-sm">Testimonial</span>
         </div>
       </div>
 

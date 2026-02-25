@@ -1,39 +1,39 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { FileText, DollarSign, LucideIcon } from "lucide-react";
 
 interface EmptyStateProps {
   type: "testimonials" | "revenue";
   onAction?: () => void;
 }
 
-export function EmptyState({ type, onAction }: EmptyStateProps) {
-  const content = {
-    testimonials: {
-      emoji: "🚀",
-      title: "Let's collect your first happy client!",
-      description: "Send your first testimonial request and watch the magic happen. It only takes a minute.",
-      buttonText: "Create Collection Form",
-    },
-    revenue: {
-      emoji: "💰",
-      title: "Connect Stripe to see revenue attribution",
-      description: "Link your payment processor to see exactly how much revenue your testimonials are generating.",
-      buttonText: "Connect Stripe",
-    },
-  };
+const contentMap: Record<string, { icon: LucideIcon; title: string; description: string; buttonText: string }> = {
+  testimonials: {
+    icon: FileText,
+    title: "No testimonials yet",
+    description: "Send your first testimonial request and start collecting client feedback. It only takes a minute.",
+    buttonText: "Create Collection Form",
+  },
+  revenue: {
+    icon: DollarSign,
+    title: "No revenue data yet",
+    description: "Connect your payment processor to see exactly how much revenue your testimonials are generating.",
+    buttonText: "Connect Stripe",
+  },
+};
 
-  const { emoji, title, description, buttonText } = content[type];
+export function EmptyState({ type, onAction }: EmptyStateProps) {
+  const { icon: Icon, title, description, buttonText } = contentMap[type];
 
   return (
-    <Card className="border-dashed border-2 border-border bg-card/50 rounded-2xl">
-      <CardContent className="p-12 flex flex-col items-center text-center">
-        <div className="text-6xl mb-4 animate-sparkle">{emoji}</div>
-        <h3 className="text-xl font-semibold text-foreground mb-2">{title}</h3>
-        <p className="text-muted-foreground max-w-md mb-6">{description}</p>
-        <Button 
-          className="gradient-sunny text-white border-0 shadow-warm hover:shadow-warm-lg transition-all"
-          onClick={onAction}
-        >
+    <Card className="border-dashed border-2 bg-card/50">
+      <CardContent className="p-10 flex flex-col items-center text-center">
+        <div className="w-12 h-12 rounded-xl bg-primary-light flex items-center justify-center mb-4">
+          <Icon className="h-6 w-6 text-primary" />
+        </div>
+        <h3 className="text-lg font-semibold text-foreground mb-1.5">{title}</h3>
+        <p className="text-sm text-muted-foreground max-w-md mb-5">{description}</p>
+        <Button onClick={onAction}>
           {buttonText}
         </Button>
       </CardContent>

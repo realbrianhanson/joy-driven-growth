@@ -5,7 +5,7 @@ import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Mail } from "lucide-react";
@@ -27,7 +27,6 @@ export default function Auth() {
   const [isMagicLinkLoading, setIsMagicLinkLoading] = useState(false);
   const [magicLinkMode, setMagicLinkMode] = useState(false);
 
-  // If already logged in, redirect
   if (user) {
     navigate("/dashboard", { replace: true });
     return null;
@@ -39,7 +38,7 @@ export default function Auth() {
     const { error } = await signIn(signInEmail, signInPassword);
     setIsSigningIn(false);
     if (error) {
-      toast({ title: "Oops!", description: error.message, variant: "destructive" });
+      toast({ title: "Unable to sign in", description: error.message, variant: "destructive" });
     } else {
       navigate("/dashboard");
     }
@@ -51,9 +50,9 @@ export default function Auth() {
     const { error } = await signUp(signUpEmail, signUpPassword, signUpName);
     setIsSigningUp(false);
     if (error) {
-      toast({ title: "Oops!", description: error.message, variant: "destructive" });
+      toast({ title: "Unable to create account", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Check your email! 📬", description: "We sent you a confirmation link." });
+      toast({ title: "Check your email", description: "We sent you a confirmation link to verify your account." });
     }
   };
 
@@ -63,9 +62,9 @@ export default function Auth() {
     const { error } = await signInWithMagicLink(signInEmail);
     setIsMagicLinkLoading(false);
     if (error) {
-      toast({ title: "Oops!", description: error.message, variant: "destructive" });
+      toast({ title: "Unable to send link", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Magic link sent! ✨", description: "Check your inbox for the login link." });
+      toast({ title: "Magic link sent", description: "Check your inbox for the login link." });
     }
   };
 
@@ -75,22 +74,24 @@ export default function Auth() {
       redirect_uri: window.location.origin,
     });
     if (result?.error) {
-      toast({ title: "Oops!", description: String(result.error), variant: "destructive" });
+      toast({ title: "Unable to sign in", description: String(result.error), variant: "destructive" });
       setIsGoogleLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-sm animate-fade-in-up">
+      <div className="w-full max-w-sm animate-fade-in">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="text-4xl mb-2">💛</div>
-          <h1 className="text-2xl font-bold text-foreground">Happy Client</h1>
-          <p className="text-sm text-muted-foreground mt-1">Turn happy clients into revenue</p>
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center mx-auto mb-3">
+            <span className="text-primary-foreground text-lg font-bold">T</span>
+          </div>
+          <h1 className="text-xl font-semibold text-foreground">Testimonial</h1>
+          <p className="text-sm text-muted-foreground mt-1">Collect and showcase client testimonials</p>
         </div>
 
-        <Card className="shadow-warm">
+        <Card>
           <Tabs defaultValue="signin">
             <CardHeader className="pb-4">
               <TabsList className="w-full">
@@ -141,7 +142,7 @@ export default function Auth() {
                         required
                       />
                     </div>
-                    <Button type="submit" className="w-full gradient-sunny border-0" disabled={isMagicLinkLoading}>
+                    <Button type="submit" className="w-full" disabled={isMagicLinkLoading}>
                       {isMagicLinkLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
                       Send Magic Link
                     </Button>
@@ -177,7 +178,7 @@ export default function Auth() {
                         required
                       />
                     </div>
-                    <Button type="submit" className="w-full gradient-sunny border-0" disabled={isSigningIn}>
+                    <Button type="submit" className="w-full" disabled={isSigningIn}>
                       {isSigningIn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Sign In
                     </Button>
@@ -229,7 +230,7 @@ export default function Auth() {
                       minLength={6}
                     />
                   </div>
-                  <Button type="submit" className="w-full gradient-sunny border-0" disabled={isSigningUp}>
+                  <Button type="submit" className="w-full" disabled={isSigningUp}>
                     {isSigningUp && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Create Account
                   </Button>

@@ -1,9 +1,10 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { LucideIcon, Send, Bell, Sparkles } from "lucide-react";
 
 interface QuickAction {
   id: string;
-  icon: string;
+  icon: LucideIcon;
   title: string;
   description: string;
   buttonText: string;
@@ -17,23 +18,23 @@ interface QuickActionsProps {
 const defaultActions: QuickAction[] = [
   {
     id: "sms",
-    icon: "📱",
+    icon: Send,
     title: "Send SMS Campaign",
     description: "Get 3x more responses",
     buttonText: "Send Now",
   },
   {
     id: "fomo",
-    icon: "🔔",
+    icon: Bell,
     title: "Add FOMO Popup",
     description: "Boost conversions 15-30%",
     buttonText: "Create Popup",
   },
   {
     id: "content",
-    icon: "✨",
+    icon: Sparkles,
     title: "Generate Content",
-    description: "Turn love into posts",
+    description: "Turn reviews into posts",
     buttonText: "Generate",
   },
 ];
@@ -44,15 +45,18 @@ export function QuickActions({ actions = defaultActions }: QuickActionsProps) {
       {actions.map((action, index) => (
         <Card 
           key={action.id}
-          className="card-hover bg-card border border-border hover:border-border-hover rounded-2xl animate-fade-in-up"
-          style={{ animationDelay: `${index * 100}ms` }}
+          className="card-hover animate-fade-in"
+          style={{ animationDelay: `${index * 80}ms` }}
         >
-          <CardContent className="p-6 flex flex-col items-center text-center">
-            <span className="text-4xl mb-3">{action.icon}</span>
-            <h3 className="font-semibold text-foreground mb-1">{action.title}</h3>
-            <p className="text-sm text-muted-foreground mb-4">{action.description}</p>
-            <Button 
-              className="w-full gradient-sunny text-white border-0 shadow-warm hover:shadow-warm-lg transition-all"
+          <CardContent className="p-5 flex flex-col items-center text-center">
+            <div className="w-10 h-10 rounded-lg bg-primary-light flex items-center justify-center mb-3">
+              <action.icon className="h-5 w-5 text-primary" />
+            </div>
+            <h3 className="font-semibold text-foreground text-sm mb-1">{action.title}</h3>
+            <p className="text-xs text-muted-foreground mb-4">{action.description}</p>
+            <Button
+              className="w-full"
+              size="sm"
               onClick={action.onClick}
             >
               {action.buttonText}

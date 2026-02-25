@@ -1,4 +1,4 @@
-import { TrendingUp, ArrowRight } from "lucide-react";
+import { TrendingUp, ArrowRight, DollarSign } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 
@@ -10,12 +10,10 @@ interface RevenueHeroCardProps {
 
 export function RevenueHeroCard({ revenue, trend, period }: RevenueHeroCardProps) {
   const [displayRevenue, setDisplayRevenue] = useState(0);
-  const [isAnimating, setIsAnimating] = useState(true);
 
-  // Animated counter effect
   useEffect(() => {
-    const duration = 1500;
-    const steps = 60;
+    const duration = 1200;
+    const steps = 50;
     const stepValue = revenue / steps;
     let current = 0;
     
@@ -23,7 +21,6 @@ export function RevenueHeroCard({ revenue, trend, period }: RevenueHeroCardProps
       current += stepValue;
       if (current >= revenue) {
         setDisplayRevenue(revenue);
-        setIsAnimating(false);
         clearInterval(timer);
       } else {
         setDisplayRevenue(Math.floor(current));
@@ -33,80 +30,54 @@ export function RevenueHeroCard({ revenue, trend, period }: RevenueHeroCardProps
     return () => clearInterval(timer);
   }, [revenue]);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
 
   return (
-    <Card className="relative overflow-hidden border-0 shadow-warm-xl">
-      {/* Gradient border effect */}
-      <div className="absolute inset-0 rounded-2xl border-glow-strong pointer-events-none" />
-      
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-card via-card to-orange-light/30 opacity-50" />
-      
-      <CardContent className="relative p-8">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-          {/* Left side - Revenue info */}
+    <Card className="relative overflow-hidden">
+      <div className="absolute top-0 left-0 right-0 h-[3px] bg-warning" />
+      <CardContent className="p-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-2xl">💰</span>
-              <h2 className="text-lg font-semibold text-foreground">Revenue Influenced</h2>
+            <div className="flex items-center gap-2 mb-2">
+              <DollarSign className="h-4 w-4 text-warning" />
+              <h2 className="text-sm font-medium text-muted-foreground">Revenue Influenced</h2>
             </div>
             
-            {/* Big revenue number */}
-            <div className="mb-3">
-              <span 
-                className={`text-5xl md:text-6xl lg:text-7xl font-bold text-gradient-sunny tracking-tight ${
-                  isAnimating ? '' : 'animate-revenue-glow'
-                }`}
-              >
-                {formatCurrency(displayRevenue)}
-              </span>
+            <div className="text-4xl md:text-5xl font-bold text-foreground tracking-tight mb-2">
+              {formatCurrency(displayRevenue)}
             </div>
             
-            <p className="text-muted-foreground text-lg mb-4">
-              from testimonials {period}
+            <p className="text-sm text-muted-foreground mb-3">
+              From testimonials {period}
             </p>
             
-            {/* Trend indicator */}
             <div className="flex items-center gap-2">
-              <div className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium ${
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border ${
                 trend >= 0 
-                  ? 'bg-emerald-light text-emerald' 
-                  : 'bg-rose-light text-rose'
+                  ? 'bg-success-light text-success border-success/20' 
+                  : 'bg-destructive-light text-destructive border-destructive/20'
               }`}>
-                <TrendingUp className={`w-4 h-4 ${trend < 0 ? 'rotate-180' : ''}`} />
-                <span>{trend >= 0 ? '+' : ''}{trend}% vs last month</span>
-              </div>
+                <TrendingUp className={`w-3 h-3 ${trend < 0 ? 'rotate-180' : ''}`} />
+                {trend >= 0 ? '+' : ''}{trend}% vs last month
+              </span>
             </div>
           </div>
           
-          {/* Right side - Mini chart placeholder & CTA */}
-          <div className="flex flex-col items-end gap-4">
-            {/* Mini trend chart */}
-            <div className="w-full lg:w-64 h-24 bg-gradient-to-r from-orange-light/50 to-amber-light/50 rounded-xl flex items-end justify-around px-3 pb-2 gap-1">
+          <div className="flex flex-col items-end gap-3">
+            <div className="w-full lg:w-56 h-20 bg-surface-subtle rounded-lg flex items-end justify-around px-3 pb-2 gap-1">
               {[40, 55, 45, 70, 60, 85, 75, 95].map((height, i) => (
                 <div
                   key={i}
-                  className="w-6 rounded-t-md gradient-sunny opacity-80"
-                  style={{ 
-                    height: `${height}%`,
-                    animationDelay: `${i * 100}ms`
-                  }}
+                  className="w-5 rounded-t bg-primary/70"
+                  style={{ height: `${height}%` }}
                 />
               ))}
             </div>
             
-            {/* View details link */}
-            <button className="group flex items-center gap-2 text-primary font-medium hover:gap-3 transition-all">
+            <button className="group flex items-center gap-1.5 text-sm text-primary font-medium hover:gap-2.5 transition-all duration-150">
               View details
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
