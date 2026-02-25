@@ -627,6 +627,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_form_submissions: {
+        Args: { form_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "member" | "viewer"

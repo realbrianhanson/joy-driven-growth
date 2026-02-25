@@ -54,10 +54,10 @@ export const useFormBySlug = (slug: string) => {
         .select("*")
         .eq("slug", slug)
         .eq("is_published", true)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
-      return data as Form;
+      return data as Form | null;
     },
     enabled: !!slug,
   });
