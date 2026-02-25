@@ -1,9 +1,9 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { useEffect, useState } from "react";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { TrendingUp, TrendingDown, LucideIcon } from "lucide-react";
 
 interface StatCardProps {
-  icon: string;
+  icon: LucideIcon;
   title: string;
   value: string | number;
   subtitle?: string;
@@ -14,10 +14,11 @@ interface StatCardProps {
   highlight?: string;
   animateValue?: boolean;
   delay?: number;
+  accentColor?: string;
 }
 
 export function StatCard({
-  icon,
+  icon: Icon,
   title,
   value,
   subtitle,
@@ -25,6 +26,7 @@ export function StatCard({
   highlight,
   animateValue = true,
   delay = 0,
+  accentColor = "bg-primary",
 }: StatCardProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [displayValue, setDisplayValue] = useState(animateValue && typeof value === 'number' ? 0 : value);
@@ -57,17 +59,19 @@ export function StatCard({
 
   return (
     <Card 
-      className={`card-hover bg-card border border-border hover:border-border-hover rounded-2xl transition-all duration-300 ${
-        isVisible ? 'animate-fade-in-up opacity-100' : 'opacity-0'
+      className={`card-hover relative overflow-hidden transition-all duration-150 ${
+        isVisible ? 'animate-fade-in opacity-100' : 'opacity-0'
       }`}
       style={{ animationDelay: `${delay}ms` }}
     >
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between mb-4">
-          <span className="text-2xl">{icon}</span>
+      {/* Top accent border */}
+      <div className={`absolute top-0 left-0 right-0 h-[3px] ${accentColor}`} />
+      <CardContent className="p-5 pt-6">
+        <div className="flex items-start justify-between mb-3">
+          <Icon className="h-5 w-5 text-muted-foreground" />
           {trend && (
-            <div className={`flex items-center gap-1 text-sm font-medium ${
-              trend.value >= 0 ? 'text-emerald' : 'text-rose'
+            <div className={`flex items-center gap-1 text-xs font-medium ${
+              trend.value >= 0 ? 'text-success' : 'text-destructive'
             }`}>
               {trend.value >= 0 ? (
                 <TrendingUp className="w-3 h-3" />
@@ -79,22 +83,22 @@ export function StatCard({
           )}
         </div>
         
-        <h3 className="text-sm font-medium text-muted-foreground mb-1">
+        <div className="text-2xl font-bold text-foreground mb-0.5">
+          {displayValue}
+        </div>
+
+        <h3 className="text-sm text-muted-foreground mb-1">
           {title}
         </h3>
         
-        <div className="text-3xl font-bold text-foreground mb-1">
-          {displayValue}
-        </div>
-        
         {subtitle && (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {subtitle}
           </p>
         )}
         
         {highlight && (
-          <p className="text-sm font-medium text-primary mt-2">
+          <p className="text-xs font-medium text-primary mt-1.5">
             {highlight}
           </p>
         )}

@@ -1,130 +1,60 @@
-@import "@fontsource/plus-jakarta-sans/400.css";
-@import "@fontsource/plus-jakarta-sans/500.css";
-@import "@fontsource/plus-jakarta-sans/600.css";
-@import "@fontsource/plus-jakarta-sans/700.css";
-@import "@fontsource/inter/400.css";
-@import "@fontsource/inter/500.css";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Happy Client "Sunny Delight" Design System
-   A warm, inviting palette that celebrates client success
-*/
-
 @layer base {
   :root {
-    /* Warm cream backgrounds */
-    --background: 30 50% 98%;
-    --background-secondary: 30 60% 96%;
-    --foreground: 20 14% 10%;
+    --background: 240 5% 97%;
+    --surface-subtle: 240 5% 96%;
+    --foreground: 240 10% 6%;
 
-    /* Cards with pure white and warm tints */
     --card: 0 0% 100%;
-    --card-foreground: 20 14% 10%;
+    --card-foreground: 240 10% 6%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 20 14% 10%;
+    --popover-foreground: 240 10% 6%;
 
-    /* Primary - Energetic Orange */
-    --primary: 24 94% 53%;
+    --primary: 239 84% 67%;
     --primary-foreground: 0 0% 100%;
+    --primary-hover: 239 84% 58%;
+    --primary-light: 226 100% 97%;
 
-    /* Secondary - Soft peach */
-    --secondary: 30 60% 96%;
-    --secondary-foreground: 20 14% 10%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 4% 16%;
 
-    /* Muted - Warm gray */
-    --muted: 30 10% 94%;
-    --muted-foreground: 20 6% 44%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
 
-    /* Accent - Golden amber */
-    --accent: 38 92% 50%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 4% 16%;
 
-    /* Destructive */
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
+    --destructive-light: 0 86% 97%;
 
-    /* Borders - Warm tones */
-    --border: 30 30% 90%;
-    --border-hover: 30 80% 65%;
-    --input: 30 30% 90%;
-    --ring: 24 94% 53%;
+    --success: 142 71% 45%;
+    --success-light: 138 76% 97%;
 
-    --radius: 0.75rem;
+    --warning: 32 95% 44%;
+    --warning-light: 48 96% 95%;
 
-    /* Custom Happy Client colors */
-    --orange: 24 94% 53%;
-    --orange-light: 30 90% 92%;
-    --amber: 38 92% 50%;
-    --amber-light: 45 93% 90%;
-    --rose: 350 89% 60%;
-    --rose-light: 350 80% 94%;
-    --emerald: 158 64% 52%;
-    --emerald-light: 158 60% 92%;
-    --sky: 199 89% 48%;
-    --sky-light: 199 80% 92%;
-    
-    /* Revenue gold */
-    --gold: 45 93% 47%;
-    --gold-light: 45 93% 88%;
+    --border: 240 6% 90%;
+    --border-subtle: 240 5% 94%;
+    --input: 240 6% 90%;
+    --ring: 239 84% 67%;
 
-    /* Shadows */
-    --shadow-warm: 0 4px 20px -4px hsl(24 94% 53% / 0.15);
-    --shadow-warm-lg: 0 8px 30px -8px hsl(24 94% 53% / 0.2);
+    --radius: 0.5rem;
 
-    /* Sidebar - Warm theme */
-    --sidebar-background: 30 50% 98%;
-    --sidebar-foreground: 20 14% 25%;
-    --sidebar-primary: 24 94% 53%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 240 4% 16%;
+    --sidebar-primary: 239 84% 67%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 30 60% 94%;
-    --sidebar-accent-foreground: 20 14% 10%;
-    --sidebar-border: 30 30% 90%;
-    --sidebar-ring: 24 94% 53%;
-  }
-
-  .dark {
-    --background: 20 14% 8%;
-    --background-secondary: 20 14% 12%;
-    --foreground: 30 20% 95%;
-
-    --card: 20 14% 12%;
-    --card-foreground: 30 20% 95%;
-
-    --popover: 20 14% 12%;
-    --popover-foreground: 30 20% 95%;
-
-    --primary: 24 94% 53%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 20 14% 16%;
-    --secondary-foreground: 30 20% 95%;
-
-    --muted: 20 14% 20%;
-    --muted-foreground: 30 10% 60%;
-
-    --accent: 38 92% 50%;
-    --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 62% 45%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 20 14% 20%;
-    --border-hover: 24 94% 53%;
-    --input: 20 14% 20%;
-    --ring: 24 94% 53%;
-
-    --sidebar-background: 20 14% 10%;
-    --sidebar-foreground: 30 20% 90%;
-    --sidebar-primary: 24 94% 53%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 20 14% 16%;
-    --sidebar-accent-foreground: 30 20% 95%;
-    --sidebar-border: 20 14% 20%;
-    --sidebar-ring: 24 94% 53%;
+    --sidebar-accent: 226 100% 97%;
+    --sidebar-accent-foreground: 239 84% 67%;
+    --sidebar-border: 240 6% 90%;
+    --sidebar-ring: 239 84% 67%;
   }
 }
 
@@ -138,148 +68,40 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-display font-semibold tracking-tight;
+    @apply font-semibold tracking-tight;
+    color: hsl(240 10% 6%);
+  }
+
+  p, span, li {
+    line-height: 1.6;
   }
 }
 
 @layer components {
-  /* Warm shadow utilities */
-  .shadow-warm {
-    box-shadow: 0 4px 20px -4px hsl(24 94% 53% / 0.12);
-  }
-
-  .shadow-warm-lg {
-    box-shadow: 0 8px 30px -8px hsl(24 94% 53% / 0.18);
-  }
-
-  .shadow-warm-xl {
-    box-shadow: 0 12px 40px -8px hsl(24 94% 53% / 0.22);
-  }
-
-  /* Gradient backgrounds */
-  .gradient-sunny {
-    background: linear-gradient(135deg, hsl(24 94% 53%) 0%, hsl(38 92% 50%) 50%, hsl(45 93% 58%) 100%);
-  }
-
-  .gradient-sunset {
-    background: linear-gradient(135deg, hsl(350 89% 60%) 0%, hsl(24 94% 53%) 50%, hsl(38 92% 50%) 100%);
-  }
-
-  .gradient-warm-bg {
-    background: linear-gradient(180deg, hsl(30 50% 98%) 0%, hsl(30 60% 96%) 100%);
-  }
-
-  /* Border glow effect */
-  .border-glow {
-    @apply border-2 border-transparent;
-    background: linear-gradient(hsl(var(--card)), hsl(var(--card))) padding-box,
-                linear-gradient(135deg, hsl(24 94% 53% / 0.5), hsl(38 92% 50% / 0.5)) border-box;
-  }
-
-  .border-glow-strong {
-    @apply border-2 border-transparent;
-    background: linear-gradient(hsl(var(--card)), hsl(var(--card))) padding-box,
-                linear-gradient(135deg, hsl(24 94% 53%), hsl(38 92% 50%)) border-box;
-  }
-
-  /* Card hover effects */
   .card-hover {
-    @apply transition-all duration-300;
+    @apply transition-all duration-150 ease-out;
   }
 
   .card-hover:hover {
-    @apply -translate-y-1 shadow-warm-lg;
-  }
-
-  /* Animated counter */
-  @keyframes countUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .animate-count-up {
-    animation: countUp 0.5s ease-out forwards;
-  }
-
-  /* Fade in animation */
-  @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .animate-fade-in-up {
-    animation: fadeInUp 0.4s ease-out forwards;
-  }
-
-  /* Pulse glow */
-  @keyframes pulseGlow {
-    0%, 100% { box-shadow: 0 0 0 0 hsl(24 94% 53% / 0.4); }
-    50% { box-shadow: 0 0 20px 4px hsl(24 94% 53% / 0.2); }
-  }
-
-  .animate-pulse-glow {
-    animation: pulseGlow 2s ease-in-out infinite;
-  }
-
-  /* Celebration sparkle */
-  @keyframes sparkle {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.8; transform: scale(1.05); }
-  }
-
-  .animate-sparkle {
-    animation: sparkle 1.5s ease-in-out infinite;
-  }
-
-  /* Slide in from right for activity feed */
-  @keyframes slideInRight {
-    from { opacity: 0; transform: translateX(20px); }
-    to { opacity: 1; transform: translateX(0); }
-  }
-
-  .animate-slide-in-right {
-    animation: slideInRight 0.3s ease-out forwards;
-  }
-
-  /* Revenue number animation */
-  @keyframes revenueGlow {
-    0%, 100% { text-shadow: 0 0 20px hsl(45 93% 47% / 0.3); }
-    50% { text-shadow: 0 0 40px hsl(45 93% 47% / 0.5); }
-  }
-
-  .animate-revenue-glow {
-    animation: revenueGlow 2s ease-in-out infinite;
-  }
-
-  /* Golden badge */
-  .badge-gold {
-    @apply bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 text-amber-900 font-semibold;
-    background-size: 200% auto;
-    animation: shimmer 3s linear infinite;
-  }
-
-  @keyframes shimmer {
-    to { background-position: 200% center; }
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    border-color: hsl(240 4% 83%);
   }
 }
 
 @layer utilities {
-  /* Text gradient utility */
-  .text-gradient-sunny {
-    @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, hsl(24 94% 53%) 0%, hsl(38 92% 50%) 100%);
+  .animate-fade-in-up {
+    animation: fade-in 0.3s ease-out forwards;
   }
 
-  /* Scrollbar styling */
-  .scrollbar-warm::-webkit-scrollbar {
-    @apply w-2;
+  .scrollbar-thin::-webkit-scrollbar {
+    @apply w-1.5;
   }
 
-  .scrollbar-warm::-webkit-scrollbar-track {
-    @apply bg-muted rounded-full;
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-transparent;
   }
 
-  .scrollbar-warm::-webkit-scrollbar-thumb {
-    @apply bg-primary/30 rounded-full hover:bg-primary/50;
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
   }
 }

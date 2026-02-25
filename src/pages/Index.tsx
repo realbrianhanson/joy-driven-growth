@@ -1,44 +1,42 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Star, DollarSign } from "lucide-react";
 
 const Index = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8">
-      <div className="text-center max-w-3xl mx-auto animate-fade-in-up">
-        <div className="text-6xl mb-6 animate-sparkle">💛</div>
-        <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 tracking-tight">
-          Turn Happy Clients Into{" "}
-          <span className="text-gradient-sunny">Revenue</span>
+      <div className="text-center max-w-2xl mx-auto animate-fade-in">
+        <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center mx-auto mb-6">
+          <span className="text-primary-foreground text-xl font-bold">T</span>
+        </div>
+        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4 tracking-tight">
+          Turn client testimonials into{" "}
+          <span className="text-primary">revenue</span>
         </h1>
-        <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-          Collect stunning testimonials, showcase them everywhere, and prove the ROI 
-          of your client relationships. Built for teams who celebrate success.
+        <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
+          Collect, showcase, and measure the impact of your client testimonials. 
+          Built for teams that care about social proof.
         </p>
         
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button 
-            asChild
-            size="lg"
-            className="gradient-sunny text-white border-0 shadow-warm hover:shadow-warm-lg transition-all text-lg px-8 h-12"
-          >
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Button asChild size="lg">
             <Link to="/dashboard">
-              View Dashboard
-              <ArrowRight className="ml-2 w-5 h-5" />
+              Get Started
+              <ArrowRight className="ml-2 w-4 h-4" />
             </Link>
           </Button>
         </div>
       </div>
       
-      <div className="mt-16 flex items-center gap-8 text-muted-foreground animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">⭐</span>
-          <span className="font-medium">4.9/5 rating</span>
+      <div className="mt-14 flex items-center gap-6 text-muted-foreground animate-fade-in" style={{ animationDelay: '150ms' }}>
+        <div className="flex items-center gap-1.5">
+          <Star className="w-4 h-4 text-warning" />
+          <span className="text-sm font-medium">4.9/5 rating</span>
         </div>
-        <div className="w-px h-6 bg-border" />
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">💰</span>
-          <span className="font-medium">$2M+ influenced</span>
+        <div className="w-px h-4 bg-border" />
+        <div className="flex items-center gap-1.5">
+          <DollarSign className="w-4 h-4 text-success" />
+          <span className="text-sm font-medium">$2M+ influenced</span>
         </div>
       </div>
     </div>
