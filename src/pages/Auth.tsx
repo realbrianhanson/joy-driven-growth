@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Mail } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import logoIcon from "@/assets/logo-icon.png";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -85,9 +84,10 @@ export default function Auth() {
       <div className="w-full max-w-sm animate-fade-in">
         {/* Logo */}
         <div className="text-center mb-8">
-          <img src={logoIcon} alt="Happy Client" className="w-10 h-10 rounded-xl mx-auto mb-3" />
-          <h1 className="text-xl font-semibold text-foreground">Happy Client</h1>
-          <p className="text-sm text-muted-foreground mt-1">Turn testimonials into revenue</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Happy<span className="text-primary">Client</span>
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1.5">Turn testimonials into revenue</p>
         </div>
 
         <Card>
