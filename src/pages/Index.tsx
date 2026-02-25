@@ -1,13 +1,14 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Star, DollarSign } from "lucide-react";
-import logoIcon from "@/assets/logo-icon.png";
 
 const Index = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8">
       <div className="text-center max-w-2xl mx-auto animate-fade-in">
-        <img src={logoIcon} alt="Happy Client" className="w-12 h-12 rounded-xl mx-auto mb-6" />
+        <h2 className="text-2xl font-bold tracking-tight text-foreground mb-6">
+          Happy<span className="text-primary">Client</span>
+        </h2>
         <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4 tracking-tight">
           Turn client testimonials into{" "}
           <span className="text-primary">revenue</span>

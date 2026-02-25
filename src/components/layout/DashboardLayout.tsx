@@ -69,10 +69,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="h-14 flex items-center gap-2.5 px-5 border-b border-border shrink-0">
-        <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-          <span className="text-primary-foreground text-xs font-bold">T</span>
-        </div>
-        <span className="font-semibold text-foreground">Testimonial</span>
+        <span className="text-base font-bold tracking-tight text-foreground">
+          Happy<span className="text-primary">Client</span>
+        </span>
       </div>
 
       {/* Nav */}
