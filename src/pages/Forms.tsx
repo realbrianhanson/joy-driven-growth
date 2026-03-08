@@ -47,28 +47,16 @@ export default function Forms() {
           ...(f.collect_video ? ["video" as const] : []),
           ...(f.collect_audio ? ["audio" as const] : []),
         ],
-        submissions: f.submission_count ?? 0,
+        responses: f.submission_count ?? 0,
+        aiInterview: !!(f.custom_questions as any)?.ai_enabled,
+        lastResponse: undefined as string | undefined,
         primaryColor: f.primary_color ?? "#6366F1",
         createdAt: f.created_at,
   });
 
   const forms = isDemoMode
     ? MOCK_FORMS.map(mapForm)
-    : (realForms ?? []).map((f) => ({
-        id: f.id,
-        name: f.name,
-        slug: f.slug,
-        status: f.is_published ? ("active" as const) : ("inactive" as const),
-        types: [
-          ...(f.collect_text ? ["text" as const] : []),
-          ...(f.collect_video ? ["video" as const] : []),
-          ...(f.collect_audio ? ["audio" as const] : []),
-        ],
-        aiInterview: !!(f.custom_questions as any)?.ai_enabled,
-        responses: f.submission_count ?? 0,
-        completionRate: 0,
-        lastResponse: undefined as string | undefined,
-      }));
+    : (realForms ?? []).map(mapForm);
 
   const formatTimeAgo = (dateString?: string) => {
     if (!dateString) return "No responses yet";

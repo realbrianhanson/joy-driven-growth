@@ -23,10 +23,8 @@ export function DemoModeBanner() {
 
   const handleToggle = () => {
     if (isDemoMode) {
-      // Switching to live — confirm first
       setConfirmOpen(true);
     } else {
-      // Switching back to demo — no confirmation needed
       toggleDemoMode();
       setLiveDismissed(false);
       localStorage.removeItem("live-banner-dismissed");
@@ -47,17 +45,15 @@ export function DemoModeBanner() {
   if (isDemoMode) {
     return (
       <>
-        <div className="fixed top-0 left-0 right-0 z-50 h-10 flex items-center justify-between px-4 md:px-6 border-b"
-          style={{ backgroundColor: "hsl(33 100% 96%)", borderColor: "hsl(30 93% 83%)" }}
-        >
+        <div className="fixed top-0 left-0 right-0 z-50 h-10 flex items-center justify-between px-4 md:px-6 border-b bg-warning-light border-warning/30">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: "hsl(25 95% 53%)" }} />
-            <span className="text-sm font-medium" style={{ color: "hsl(21 78% 26%)" }}>
+            <span className="w-2 h-2 rounded-full animate-pulse bg-warning" />
+            <span className="text-sm font-medium text-foreground">
               Demo Mode — Showing sample data
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium" style={{ color: "hsl(21 78% 26%)" }}>Use Real Data</span>
+            <span className="text-xs font-medium text-muted-foreground">Use Real Data</span>
             <Switch checked={false} onCheckedChange={handleToggle} />
           </div>
         </div>
@@ -85,12 +81,10 @@ export function DemoModeBanner() {
   if (liveDismissed) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 h-10 flex items-center justify-between px-4 md:px-6 border-b"
-      style={{ backgroundColor: "hsl(138 76% 97%)", borderColor: "hsl(142 69% 82%)" }}
-    >
+    <div className="fixed top-0 left-0 right-0 z-50 h-10 flex items-center justify-between px-4 md:px-6 border-b bg-success-light border-success/30">
       <div className="flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: "hsl(142 71% 45%)" }} />
-        <span className="text-sm font-medium" style={{ color: "hsl(143 64% 24%)" }}>
+        <span className="w-2 h-2 rounded-full bg-success" />
+        <span className="text-sm font-medium text-foreground">
           Live Mode — Connected to real data
         </span>
       </div>
