@@ -1,6 +1,6 @@
 import { TrendingUp, ArrowRight, DollarSign } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { useEffect, useState } from "react";
+import { forwardRef, useEffect, useState } from "react";
 
 interface RevenueHeroCardProps {
   revenue: number;
@@ -8,7 +8,7 @@ interface RevenueHeroCardProps {
   period: string;
 }
 
-export function RevenueHeroCard({ revenue, trend, period }: RevenueHeroCardProps) {
+export const RevenueHeroCard = forwardRef<HTMLDivElement, RevenueHeroCardProps>(({ revenue, trend, period }, ref) => {
   const [displayRevenue, setDisplayRevenue] = useState(0);
 
   useEffect(() => {
