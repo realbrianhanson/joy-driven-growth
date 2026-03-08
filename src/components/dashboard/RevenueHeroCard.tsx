@@ -34,7 +34,7 @@ export const RevenueHeroCard = forwardRef<HTMLDivElement, RevenueHeroCardProps>(
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
 
   return (
-    <Card className="relative overflow-hidden">
+    <Card ref={ref} className="relative overflow-hidden">
       <div className="absolute top-0 left-0 right-0 h-[3px] bg-warning" />
       <CardContent className="p-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -84,4 +84,6 @@ export const RevenueHeroCard = forwardRef<HTMLDivElement, RevenueHeroCardProps>(
       </CardContent>
     </Card>
   );
-}
+});
+
+RevenueHeroCard.displayName = "RevenueHeroCard";
