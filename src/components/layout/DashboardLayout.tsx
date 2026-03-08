@@ -156,7 +156,7 @@ const DashboardLayout = forwardRef<HTMLDivElement, { children: React.ReactNode }
     const { isDemoMode } = useDemoMode();
 
     // Banner is 40px tall; offset everything when visible
-    const bannerH = isDemoMode || !localStorage.getItem("live-banner-dismissed") ? "h-10" : "h-0";
+    const showBanner = isDemoMode || !localStorage.getItem("live-banner-dismissed");
 
     return (
       <div ref={ref} className="min-h-screen flex w-full bg-background">
