@@ -188,7 +188,7 @@ const DashboardLayout = forwardRef<HTMLDivElement, { children: React.ReactNode }
         </div>
 
         {/* Main content */}
-        <main className="flex-1 md:ml-60 mt-24 md:mt-10 overflow-y-auto">
+        <main className={`flex-1 md:ml-60 ${showBanner ? "mt-24 md:mt-10" : "mt-14 md:mt-0"} overflow-y-auto`}>
           {children}
         </main>
       </div>

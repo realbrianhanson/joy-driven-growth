@@ -47,7 +47,9 @@ export default function Forms() {
           ...(f.collect_video ? ["video" as const] : []),
           ...(f.collect_audio ? ["audio" as const] : []),
         ],
-        submissions: f.submission_count ?? 0,
+        responses: f.submission_count ?? 0,
+        aiInterview: !!(f.custom_questions as any)?.ai_enabled,
+        lastResponse: undefined as string | undefined,
         primaryColor: f.primary_color ?? "#6366F1",
         createdAt: f.created_at,
   });
