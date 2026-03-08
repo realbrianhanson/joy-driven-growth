@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, forwardRef } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useDemoMode } from "@/contexts/DemoModeContext";
 import { DemoModeBanner } from "@/components/layout/DemoModeBanner";
