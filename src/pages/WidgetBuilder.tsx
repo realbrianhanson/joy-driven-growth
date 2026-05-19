@@ -317,14 +317,20 @@ const WidgetBuilder = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="relative">
-                  <pre className="p-4 rounded-lg bg-foreground/5 text-sm overflow-x-auto">
-                    <code className="text-foreground">{embedCode}</code>
-                  </pre>
-                  <Button size="sm" className="absolute top-2 right-2" onClick={copyEmbedCode}>
-                    <Copy className="w-4 h-4 mr-1" />Copy
-                  </Button>
-                </div>
+                {isNew ? (
+                  <p className="text-sm text-muted-foreground">
+                    Save the widget first to get an embed code.
+                  </p>
+                ) : (
+                  <div className="relative">
+                    <pre className="p-4 rounded-lg bg-foreground/5 text-sm overflow-x-auto">
+                      <code className="text-foreground">{embedCode}</code>
+                    </pre>
+                    <Button size="sm" className="absolute top-2 right-2" onClick={copyEmbedCode}>
+                      <Copy className="w-4 h-4 mr-1" />Copy
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
