@@ -7,19 +7,10 @@ import {
   Target,
   Clock,
   Download,
-  RefreshCw,
-  Lightbulb,
   BarChart3,
   PieChart,
-  FileText,
-  Image as ImageIcon,
   MessageSquare,
-  AlertCircle,
-  ChevronRight,
-  Sparkles,
   Video,
-  MessageCircle,
-  Zap,
   CreditCard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -55,21 +46,15 @@ import {
 import { toast } from "sonner";
 import { useAnalyticsData } from "@/hooks/use-analytics-data";
 import { useDemoMode } from "@/contexts/DemoModeContext";
+import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
 import { MOCK_ANALYTICS_DATA, MOCK_WIDGET_DATA } from "@/data/mock/analytics";
-
-// AI Insights (static for now — could be generated later)
-const aiInsights = [
-  { icon: Video, text: "Video testimonials earn 3x more revenue than text", type: "success" },
-  { icon: MessageCircle, text: "SMS campaigns have 68% completion vs 23% email", type: "success" },
-  { icon: Zap, text: "Exit-intent popups converting best on pricing page", type: "info" },
-  { icon: AlertCircle, text: "You need more testimonials about integrations", type: "warning" },
-  { icon: Users, text: 'Customer "Acme Corp" is due for follow-up', type: "action" },
-];
 
 const Analytics = () => {
   const navigate = useNavigate();
   const [dateRange, setDateRange] = useState<"today" | "7d" | "30d" | "90d">("30d");
   const { isDemoMode } = useDemoMode();
+  const { user } = useAuth();
   const analytics = useAnalyticsData(dateRange);
 
   const formatCurrency = (amount: number) =>
@@ -77,7 +62,37 @@ const Analytics = () => {
 
   const formatNumber = (num: number) => (num >= 1000 ? (num / 1000).toFixed(1) + "k" : num.toString());
 
-  const handleExport = (type: string) => toast.success(`Exporting ${type}...`);
+  const handleExportCsv = async () => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from("testimonials")
+      .select("created_at, author_name, author_email, author_company, content, rating, type, status, source, revenue_attributed")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+    if (error) {
+      toast.error("Export failed", { description: error.message });
+      return;
+    }
+    if (!data?.length) {
+      toast("No data to export");
+      return;
+    }
+    const headers = Object.keys(data[0]);
+    const escape = (v: unknown) => {
+      const s = v == null ? "" : String(v).replace(/"/g, '""');
+      return /[",\n]/.test(s) ? `"${s}"` : s;
+    };
+    const csv = [headers.join(","), ...data.map((row) => headers.map((h) => escape((row as Record<string, unknown>)[h])).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `testimonials-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   // Use mock data in demo mode
   const totalRevenue = isDemoMode ? MOCK_ANALYTICS_DATA.totalRevenue : analytics.totalRevenue;
@@ -227,12 +242,6 @@ const Analytics = () => {
                         <div className="p-3 rounded-lg bg-secondary/50">
                           <p className="text-xs text-muted-foreground">Avg Order</p>
                           <p className="text-xl font-semibold text-foreground">{formatCurrency(avgOrderValue)}</p>
-                        </div>
-                        <div className="p-3 rounded-lg bg-secondary/50">
-                          <p className="text-xs text-muted-foreground">ROI</p>
-                          <p className="text-xl font-semibold text-warning">
-                            {totalRevenue > 0 ? `${Math.round((totalRevenue / Math.max(totalRevenue * 0.1, 1)) * 100)}%` : "—"}
-                          </p>
                         </div>
                       </div>
                     </div>
@@ -595,37 +604,14 @@ const Analytics = () => {
           </Card>
         </div>
 
-        {/* ============ AI INSIGHTS ============ */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
-              <Lightbulb className="w-5 h-5 text-warning" />
-              Smart Insights
-            </h2>
-            <Button variant="outline" size="sm" onClick={() => toast.success("Insights refreshed! ✨")}>
-              <RefreshCw className="w-4 h-4 mr-2" /> Refresh
-            </Button>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {aiInsights.map((insight, i) => (
-              <Card key={i} className={`bg-card hover:shadow-sm transition-all cursor-pointer ${
-                insight.type === "warning" ? "border-warning/30" : insight.type === "action" ? "border-primary/30" : ""
-              }`}>
-                <CardContent className="p-4 flex items-start gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                    insight.type === "success" ? "bg-success/10" : insight.type === "warning" ? "bg-warning/10" : insight.type === "action" ? "bg-primary/10" : "bg-accent/50"
-                  }`}>
-                    <insight.icon className={`w-4 h-4 ${
-                      insight.type === "success" ? "text-success" : insight.type === "warning" ? "text-warning" : insight.type === "action" ? "text-primary" : "text-primary"
-                    }`} />
-                  </div>
-                  <p className="text-sm text-foreground flex-1">{insight.text}</p>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
+        {/* ============ INSIGHTS ============ */}
+        <Card className="bg-card mb-8">
+          <CardContent className="p-6">
+            <p className="text-sm text-muted-foreground">
+              AI-generated insights appear here as you collect more testimonials. We need at least 10 approved testimonials with revenue attribution to surface trends.
+            </p>
+          </CardContent>
+        </Card>
 
         {/* ============ EXPORT OPTIONS ============ */}
         <Card className="bg-card">
@@ -635,17 +621,9 @@ const Analytics = () => {
                 <h3 className="font-semibold text-foreground mb-1">Export Your Data</h3>
                 <p className="text-sm text-muted-foreground">Download reports to share with your team</p>
               </div>
-              <div className="flex gap-3">
-                <Button variant="outline" onClick={() => handleExport("PDF")}>
-                  <FileText className="w-4 h-4 mr-2" /> PDF Report
-                </Button>
-                <Button variant="outline" onClick={() => handleExport("CSV")}>
-                  <Download className="w-4 h-4 mr-2" /> CSV Data
-                </Button>
-                <Button variant="outline" onClick={() => handleExport("PNG")}>
-                  <ImageIcon className="w-4 h-4 mr-2" /> PNG Charts
-                </Button>
-              </div>
+              <Button variant="outline" onClick={handleExportCsv}>
+                <Download className="w-4 h-4 mr-2" /> Export CSV
+              </Button>
             </div>
           </CardContent>
         </Card>
