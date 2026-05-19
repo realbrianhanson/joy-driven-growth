@@ -21,8 +21,6 @@ import {
   Settings,
   LogOut,
   Menu,
-  Chrome,
-  Users,
 } from "lucide-react";
 
 const mainNav = [
@@ -39,10 +37,6 @@ const mainNav = [
   ]},
   { section: "Measure", items: [
     { label: "Analytics", icon: BarChart3, path: "/dashboard/analytics" },
-  ]},
-  { section: "Tools", items: [
-    { label: "Chrome Extension", icon: Chrome, path: "/dashboard/extension" },
-    { label: "Agency", icon: Users, path: "/dashboard/agency" },
   ]},
 ];
 

@@ -110,6 +110,15 @@ const AgencyDashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container max-w-7xl mx-auto py-8 px-4">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 mb-6 flex items-start gap-3">
+          <span className="text-2xl">🚧</span>
+          <div>
+            <h3 className="font-semibold text-foreground">Agency mode is coming soon</h3>
+            <p className="text-sm text-muted-foreground">
+              Multi-client workspaces, custom domains, and white-label dashboards are in design. The data on this page is illustrative only.
+            </p>
+          </div>
+        </div>
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>

@@ -334,6 +334,41 @@ export default function Testimonials() {
     }
   };
 
+  const handleBulkExport = () => {
+    const selected = allTestimonials.filter((t) => selectedIds.has(t.id));
+    if (selected.length === 0) {
+      toast({ title: "Select testimonials to export first" });
+      return;
+    }
+    const rows = selected.map((t) => ({
+      created_at: t.createdAt,
+      author_name: t.name,
+      author_company: t.company,
+      content: t.content,
+      rating: t.rating,
+      type: t.type,
+      status: t.status,
+      source: t.source,
+      revenue: t.revenue ?? 0,
+    }));
+    const headers = Object.keys(rows[0]);
+    const escape = (v: unknown) => {
+      const s = v == null ? "" : String(v).replace(/"/g, '""');
+      return /[",\n]/.test(s) ? `"${s}"` : s;
+    };
+    const csv = [headers.join(","), ...rows.map((row) => headers.map((h) => escape((row as Record<string, unknown>)[h])).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `testimonials-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: `Exported ${rows.length} testimonial${rows.length !== 1 ? "s" : ""}` });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -368,7 +403,7 @@ export default function Testimonials() {
               selectedIds.forEach((id) => handleApprove(id));
               setSelectedIds(new Set());
             }}
-            onBulkExport={() => toast({ title: "Exporting testimonials..." })}
+            onBulkExport={handleBulkExport}
             onBulkDelete={() => {
               selectedIds.forEach((id) => {
                 if (!isDemoMode) deleteMutation.mutate(id);
