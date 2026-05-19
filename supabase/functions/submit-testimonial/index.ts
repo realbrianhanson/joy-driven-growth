@@ -23,7 +23,8 @@ serve(async (req) => {
       type = "text",
       video_url,
       audio_url,
-      custom_fields = {}
+      custom_fields = {},
+      source = "form",
     } = await req.json();
 
     if (!form_slug || !author_name) {
@@ -77,6 +78,11 @@ serve(async (req) => {
     }
     if (JSON.stringify(custom_fields).length > 4096) {
       return bad("custom_fields too large");
+    }
+
+    const allowedSources = ["form", "ai_interview", "sms", "import"];
+    if (typeof source !== "string" || !allowedSources.includes(source)) {
+      return bad("source must be one of form, ai_interview, sms, import");
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -159,7 +165,7 @@ serve(async (req) => {
         audio_url,
         sentiment,
         ai_summary: aiSummary,
-        source: "form",
+        source,
         custom_fields,
       })
       .select()
