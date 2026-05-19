@@ -180,10 +180,9 @@ const DashboardLayout = forwardRef<HTMLDivElement, { children: React.ReactNode }
             </SheetContent>
           </Sheet>
           <div className="flex items-center gap-2 ml-2">
-            <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground text-[10px] font-bold">T</span>
-            </div>
-            <span className="font-semibold text-foreground text-sm">Testimonial</span>
+            <span className="font-bold text-foreground text-sm">
+              Happy<span className="text-primary">Client</span>
+            </span>
           </div>
         </div>
 

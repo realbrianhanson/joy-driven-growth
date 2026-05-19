@@ -620,6 +620,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_wall_public: { Args: { p_slug: string }; Returns: Json }
+      get_widget_public: { Args: { p_widget_id: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -637,6 +639,15 @@ export type Database = {
       }
       increment_testimonial_revenue: {
         Args: { p_amount: number; p_testimonial_id: string }
+        Returns: undefined
+      }
+      increment_wall_views: { Args: { p_slug: string }; Returns: undefined }
+      increment_widget_clicks: {
+        Args: { p_widget_id: string }
+        Returns: undefined
+      }
+      increment_widget_impressions: {
+        Args: { p_widget_id: string }
         Returns: undefined
       }
       increment_widget_revenue: {
