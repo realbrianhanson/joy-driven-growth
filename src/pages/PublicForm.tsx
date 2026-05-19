@@ -259,7 +259,7 @@ export default function PublicForm() {
 
             <div className="mt-6 pt-4 border-t border-border">
               <p className="text-xs text-muted-foreground">Powered by</p>
-              <p className="text-xs font-semibold text-foreground">Testimonial</p>
+              <p className="text-xs font-semibold text-foreground">Happy Client</p>
             </div>
           </div>
         )}
