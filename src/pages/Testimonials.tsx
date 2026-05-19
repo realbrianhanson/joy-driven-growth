@@ -477,13 +477,10 @@ export default function Testimonials() {
                   handleApprove(selectedTestimonial.id);
                   handleCloseDetail();
                 }}
-                onReject={() => {
-                  toast({ title: "Testimonial rejected" });
-                  handleCloseDetail();
-                }}
+                onReject={() => handleReject(selectedTestimonial.id)}
                 onRequestEdit={() => toast({ title: "Edit request sent" })}
                 onFeature={() => handleFeature(selectedTestimonial.id)}
-                onGenerateContent={(type) => toast({ title: `Generating ${type} content...` })}
+                onGenerateContent={handleGenerateContent}
                 onClose={handleCloseDetail}
               />
             )}
