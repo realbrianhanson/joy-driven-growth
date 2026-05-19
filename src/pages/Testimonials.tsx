@@ -26,6 +26,7 @@ import {
   useApproveTestimonial,
   useUpdateTestimonial,
   useDeleteTestimonial,
+  useRejectTestimonial,
 } from "@/hooks/use-testimonials";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
