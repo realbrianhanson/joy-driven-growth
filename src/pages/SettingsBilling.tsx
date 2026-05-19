@@ -95,7 +95,8 @@ const SettingsBilling = () => {
               </div>
 
               <div className="space-y-4">
-                <h3 className="font-medium text-foreground mb-3">Usage This Month</h3>
+                <h3 className="font-medium text-foreground mb-1">Usage</h3>
+                <p className="text-xs text-muted-foreground mb-3">Lifetime totals. Per-period reporting coming soon.</p>
                 {isLoading ? (
                   <div className="space-y-4">{[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
                 ) : (
@@ -136,21 +137,21 @@ const SettingsBilling = () => {
           <CardContent>
             <div className="flex items-center justify-between p-6 rounded-xl border-2 border-primary/20 bg-primary/5">
               <div>
-                <div className="flex items-baseline gap-2 mb-2">
-                  <span className="text-3xl font-bold text-foreground">$49</span>
-                  <span className="text-muted-foreground">/month</span>
-                </div>
+                <div className="mb-2 text-3xl font-bold text-foreground">Get in touch</div>
+                <p className="text-sm text-muted-foreground mb-4">Pricing is being finalized — we'll send you a fair quote based on volume.</p>
                 <ul className="space-y-1">
-                  {['Unlimited testimonials', '100 SMS/mo', 'AI content studio', 'Revenue tracking'].map((f, i) => (
+                  {['Unlimited testimonials', 'SMS campaigns', 'AI content studio', 'Revenue tracking'].map((f, i) => (
                     <li key={i} className="flex items-center gap-2 text-sm text-foreground">
                       <Check className="w-3 h-3 text-emerald" />{f}
                     </li>
                   ))}
                 </ul>
               </div>
-              <Button className="gradient-sunny text-white shadow-warm" onClick={() => window.open('#', '_blank')}>
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Upgrade Now
+              <Button asChild className="gradient-sunny text-white shadow-warm">
+                <a href="mailto:hello@happyclient.io?subject=Upgrade%20to%20Pro">
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Get in touch
+                </a>
               </Button>
             </div>
           </CardContent>
