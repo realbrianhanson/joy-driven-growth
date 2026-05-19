@@ -12,6 +12,7 @@ import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useForm as useFormData, useCreateForm, useUpdateForm } from "@/hooks/use-forms";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Question {
   id: string;
@@ -109,6 +110,27 @@ export default function FormBuilder() {
   const [selectedQuestion, setSelectedQuestion] = useState<string | null>(null);
   const [settings, setSettings] = useState<FormSettings>(defaultSettings);
   const [initialized, setInitialized] = useState(isNew);
+  const [slugTaken, setSlugTaken] = useState(false);
+  const [checkingSlug, setCheckingSlug] = useState(false);
+
+  useEffect(() => {
+    const slug = settings.slug;
+    if (!slug || slug.length < 3) {
+      setSlugTaken(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setCheckingSlug(true);
+      const { data } = await supabase
+        .from("forms")
+        .select("id, user_id")
+        .eq("slug", slug)
+        .maybeSingle();
+      setCheckingSlug(false);
+      setSlugTaken(!!data && data.id !== id);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [settings.slug, id]);
 
   // Populate from existing form
   useEffect(() => {
@@ -151,6 +173,10 @@ export default function FormBuilder() {
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
   const handleSave = () => {
+    if (slugTaken) {
+      toast({ title: "That URL is already taken. Please pick a different slug.", variant: "destructive" });
+      return;
+    }
     const formData = {
       name: settings.name,
       slug: settings.slug,
@@ -282,6 +308,8 @@ export default function FormBuilder() {
                       <Copy className="w-4 h-4" />
                     </Button>
                   </div>
+                  {checkingSlug && <p className="text-xs text-muted-foreground mt-1">Checking availability…</p>}
+                  {slugTaken && <p className="text-xs text-destructive mt-1">This URL is taken — try a different one.</p>}
                 </div>
                 <div className="flex items-center justify-between">
                   <Label>Published</Label>
