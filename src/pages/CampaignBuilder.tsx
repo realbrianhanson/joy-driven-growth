@@ -23,16 +23,18 @@ const steps = [
 
 const SMS_CHAR_LIMIT = 160;
 
-function parsePhoneNumbers(text: string): string[] {
+function parseRecipients(text: string): { phone: string; first_name: string }[] {
   return text
-    .split(/[\n,]+/)
-    .map((s) => s.trim())
-    .filter((s) => {
-      if (!s) return false;
-      // starts with + and at least 10 digits, or 10+ digits
-      const digits = s.replace(/\D/g, "");
-      return digits.length >= 10;
-    });
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split(/[,\t]/).map((s) => s.trim());
+      const phone = parts[0];
+      const first_name = parts[1] ?? "";
+      return { phone, first_name };
+    })
+    .filter(({ phone }) => /^\+[1-9]\d{1,14}$/.test(phone));
 }
 
 export default function CampaignBuilder() {
@@ -49,30 +51,29 @@ export default function CampaignBuilder() {
 
   // Step 2 - Message
   const [message, setMessage] = useState(
-    "Hey {first_name}! 👋 Quick favor - would you share your experience with us? Takes 60 sec: {form_link}"
+    "Hey {first_name}! 👋 Quick favor - would you share your experience with us? Takes 60 sec: {form_link} Reply STOP to opt out."
   );
 
   // Step 3 - Recipients
   const [recipientsText, setRecipientsText] = useState("");
 
-  // Step 4 - Schedule
-  const [timing, setTiming] = useState<"now" | "scheduled">("now");
-  const [scheduledDate, setScheduledDate] = useState("");
+  // Step 4 - Schedule (scheduled delivery not yet implemented)
+  const timing = "now" as const;
 
   // Sending state
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [sendProgress, setSendProgress] = useState({ current: 0, total: 0 });
 
-  const validNumbers = parsePhoneNumbers(recipientsText);
+  const validRecipients = parseRecipients(recipientsText);
   const selectedForm = forms?.find((f) => f.id === selectedFormId);
   const formLink = selectedForm
     ? `${window.location.origin}/collect/${selectedForm.slug}`
     : "{form_link}";
 
   const previewMessage = message
-    .replace("{first_name}", "Sarah")
-    .replace("{form_link}", formLink);
+    .replace(/\{first_name\}/g, "Sarah")
+    .replace(/\{form_link\}/g, formLink);
 
   const insertVariable = (v: string) => {
     setMessage((prev) => prev + v);
@@ -82,8 +83,8 @@ export default function CampaignBuilder() {
     switch (currentStep) {
       case 1: return campaignName.trim().length > 0 && selectedFormId.length > 0;
       case 2: return message.trim().length > 0;
-      case 3: return validNumbers.length > 0;
-      case 4: return timing === "now" || (timing === "scheduled" && scheduledDate);
+      case 3: return validRecipients.length > 0;
+      case 4: return true;
       default: return true;
     }
   };
@@ -99,9 +100,9 @@ export default function CampaignBuilder() {
         type: "sms" as const,
         status,
         message_template: message,
-        recipients: validNumbers.map((p) => ({ phone: p })),
-        total_recipients: validNumbers.length,
-        scheduled_at: timing === "scheduled" ? scheduledDate : null,
+        recipients: validRecipients,
+        total_recipients: validRecipients.length,
+        scheduled_at: null,
       })
       .select()
       .single();
@@ -125,38 +126,33 @@ export default function CampaignBuilder() {
   const handleSend = async () => {
     setIsSending(true);
     try {
-      const campaign = await saveCampaign(timing === "scheduled" ? "scheduled" : "active");
+      const campaign = await saveCampaign("active");
       if (!campaign) throw new Error("Failed to create campaign");
 
-      if (timing === "now") {
-        const total = validNumbers.length;
-        setSendProgress({ current: 0, total });
+      const total = validRecipients.length;
+      setSendProgress({ current: 0, total });
 
-        for (let i = 0; i < total; i++) {
-          const phone = validNumbers[i];
-          const personalizedMsg = message
-            .replace("{first_name}", "")
-            .replace("{form_link}", formLink);
+      for (let i = 0; i < total; i++) {
+        const recipient = validRecipients[i];
+        const personalizedMsg = message
+          .replace(/\{first_name\}/g, recipient.first_name || "there")
+          .replace(/\{form_link\}/g, formLink);
 
-          await supabase.functions.invoke("send-sms", {
-            body: { to: phone, message: personalizedMsg, campaign_id: campaign.id },
-          });
-          setSendProgress({ current: i + 1, total });
-        }
-
-        // Update campaign stats
-        await supabase
-          .from("campaigns")
-          .update({ sent_count: total, status: "active" as const })
-          .eq("id", campaign.id);
+        await supabase.functions.invoke("send-sms", {
+          body: { to: recipient.phone, message: personalizedMsg, campaign_id: campaign.id },
+        });
+        setSendProgress({ current: i + 1, total });
       }
 
+      // Update campaign stats
+      await supabase
+        .from("campaigns")
+        .update({ sent_count: total, status: "active" as const })
+        .eq("id", campaign.id);
+
       toast({
-        title: timing === "now" ? "Campaign sent! 🚀" : "Campaign scheduled! 📅",
-        description:
-          timing === "now"
-            ? `SMS sent to ${validNumbers.length} recipients`
-            : `Scheduled for ${new Date(scheduledDate).toLocaleString()}`,
+        title: "Campaign sent! 🚀",
+        description: `SMS sent to ${validRecipients.length} recipients`,
       });
       navigate("/dashboard/campaigns");
     } catch (e: any) {
