@@ -347,22 +347,34 @@ export default function CampaignBuilder() {
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Add recipients</h2>
-                  <p className="text-muted-foreground">Enter phone numbers, one per line or comma-separated</p>
+                  <p className="text-muted-foreground">One per line. Optionally add a first name after a comma.</p>
+                </div>
+
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 mb-4">
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl">⚠️</span>
+                    <div className="text-xs text-foreground">
+                      <p className="font-semibold mb-1">SMS compliance — you are responsible</p>
+                      <p className="text-muted-foreground">
+                        Only send to recipients who have given you explicit prior consent to receive SMS from your business. Include "Reply STOP to unsubscribe" in your message template when sending to US numbers. You're also responsible for 10DLC registration with carriers — Happy Client does not handle this for you.
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <div>
-                  <Label>Phone Numbers</Label>
+                  <Label>Recipients</Label>
                   <Textarea
                     value={recipientsText}
                     onChange={(e) => setRecipientsText(e.target.value)}
                     rows={8}
-                    placeholder={"+1234567890\n+1987654321\nor comma-separated: +1555000111, +1555000222"}
+                    placeholder={"+1234567890, Jane\n+1987654321, Bob\n+1555000111"}
                     className="mt-1 font-mono text-sm resize-none"
                   />
                   <div className="flex items-center justify-between mt-2 text-sm">
-                    <span className="text-muted-foreground">Must start with + or be 10+ digits</span>
-                    <Badge variant={validNumbers.length > 0 ? "default" : "secondary"}>
-                      {validNumbers.length} valid number{validNumbers.length !== 1 ? "s" : ""}
+                    <span className="text-muted-foreground">E.164 format (e.g. +14155551234)</span>
+                    <Badge variant={validRecipients.length > 0 ? "default" : "secondary"}>
+                      {validRecipients.length} valid recipient{validRecipients.length !== 1 ? "s" : ""}
                     </Badge>
                   </div>
                 </div>
@@ -377,9 +389,9 @@ export default function CampaignBuilder() {
                   <p className="text-muted-foreground">Choose when to deliver your campaign</p>
                 </div>
 
-                <RadioGroup value={timing} onValueChange={(v) => setTiming(v as "now" | "scheduled")}>
+                <RadioGroup value="now">
                   <div className="space-y-3">
-                    <Card className={`cursor-pointer ${timing === "now" ? "border-primary" : "border-border"}`}>
+                    <Card className="border-primary">
                       <CardContent className="p-4 flex items-center gap-4">
                         <RadioGroupItem value="now" id="now" />
                         <Label htmlFor="now" className="flex-1 cursor-pointer">
@@ -388,21 +400,16 @@ export default function CampaignBuilder() {
                         </Label>
                       </CardContent>
                     </Card>
-                    <Card className={`cursor-pointer ${timing === "scheduled" ? "border-primary" : "border-border"}`}>
+                    <Card className="cursor-not-allowed opacity-60 border-border">
                       <CardContent className="p-4 flex items-center gap-4">
-                        <RadioGroupItem value="scheduled" id="scheduled" />
-                        <Label htmlFor="scheduled" className="flex-1 cursor-pointer">
-                          <div className="font-medium">Schedule for later</div>
-                          <div className="text-sm text-muted-foreground">Pick a specific date and time</div>
+                        <RadioGroupItem value="scheduled" id="scheduled" disabled />
+                        <Label htmlFor="scheduled" className="flex-1 cursor-not-allowed">
+                          <div className="font-medium flex items-center gap-2">
+                            Schedule for later
+                            <Badge variant="secondary" className="text-xs">Coming soon</Badge>
+                          </div>
+                          <div className="text-sm text-muted-foreground">Scheduled delivery is in development.</div>
                         </Label>
-                        {timing === "scheduled" && (
-                          <Input
-                            type="datetime-local"
-                            value={scheduledDate}
-                            onChange={(e) => setScheduledDate(e.target.value)}
-                            className="w-auto"
-                          />
-                        )}
                       </CardContent>
                     </Card>
                   </div>
@@ -422,11 +429,11 @@ export default function CampaignBuilder() {
                     </div>
                     <div className="flex justify-between p-3 bg-muted/50 rounded-xl text-sm">
                       <span className="text-muted-foreground">Recipients</span>
-                      <span className="font-medium text-foreground">{validNumbers.length} contacts</span>
+                      <span className="font-medium text-foreground">{validRecipients.length} contacts</span>
                     </div>
                     <div className="flex justify-between p-3 bg-warning/10 rounded-xl text-sm">
                       <span className="font-medium text-foreground">SMS Credits</span>
-                      <span className="font-bold text-foreground">{validNumbers.length} credits</span>
+                      <span className="font-bold text-foreground">{validRecipients.length} credits</span>
                     </div>
                   </div>
                 </div>
