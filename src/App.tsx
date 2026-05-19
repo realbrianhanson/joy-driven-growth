@@ -36,6 +36,8 @@ const SettingsBilling = lazy(() => import("./pages/SettingsBilling"));
 const SettingsApi = lazy(() => import("./pages/SettingsApi"));
 const AgencyDashboard = lazy(() => import("./pages/AgencyDashboard"));
 const ChromeExtension = lazy(() => import("./pages/ChromeExtension"));
+const PublicWall = lazy(() => import("./pages/PublicWall"));
+const EmbedWidget = lazy(() => import("./pages/EmbedWidget"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -71,6 +73,8 @@ const AnimatedRoutes = () => {
         <Route path="/login" element={<Suspense fallback={<PageLoader />}><Auth /></Suspense>} />
         <Route path="/collect/:slug" element={<Suspense fallback={<PageLoader />}><PublicForm /></Suspense>} />
         <Route path="/collect/:slug/ai" element={<Suspense fallback={<PageLoader />}><AiInterview /></Suspense>} />
+        <Route path="/wall/:slug" element={<Suspense fallback={<PageLoader />}><PublicWall /></Suspense>} />
+        <Route path="/embed/widget/:id" element={<Suspense fallback={<PageLoader />}><EmbedWidget /></Suspense>} />
 
         {/* Dashboard routes - protected + layout */}
         <Route path="/dashboard" element={<DashboardRoute><Dashboard /></DashboardRoute>} />
