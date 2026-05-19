@@ -12,33 +12,80 @@ serve(async (req) => {
   }
 
   try {
-    const { 
-      user_id,
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const authClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData, error: userError } = await authClient.auth.getUser();
+    if (userError || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const userId = userData.user.id;
+
+    const body = await req.json();
+    const {
       testimonial_id,
       widget_id,
       amount,
       currency = "USD",
       source = "manual",
       customer_email,
-      metadata = {}
-    } = await req.json();
+      metadata = {},
+    } = body;
 
-    if (!user_id || !amount) {
+    if (typeof amount !== "number" || !(amount > 0)) {
       return new Response(
-        JSON.stringify({ error: "user_id and amount are required" }),
+        JSON.stringify({ error: "amount must be a positive number" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Create revenue event
+    if (testimonial_id) {
+      const { data: t } = await supabase
+        .from("testimonials")
+        .select("id")
+        .eq("id", testimonial_id)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!t) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    if (widget_id) {
+      const { data: w } = await supabase
+        .from("widgets")
+        .select("id")
+        .eq("id", widget_id)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!w) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const { data: revenueEvent, error: insertError } = await supabase
       .from("revenue_events")
       .insert({
-        user_id,
+        user_id: userId,
         testimonial_id,
         widget_id,
         amount,
@@ -54,45 +101,22 @@ serve(async (req) => {
       throw new Error(insertError.message);
     }
 
-    // Update testimonial revenue if attributed
     if (testimonial_id) {
-      const { data: testimonial } = await supabase
-        .from("testimonials")
-        .select("revenue_attributed")
-        .eq("id", testimonial_id)
-        .single();
-
-      if (testimonial) {
-        await supabase
-          .from("testimonials")
-          .update({
-            revenue_attributed: (testimonial.revenue_attributed || 0) + amount,
-          })
-          .eq("id", testimonial_id);
-      }
+      await supabase.rpc("increment_testimonial_revenue", {
+        p_testimonial_id: testimonial_id,
+        p_amount: amount,
+      });
     }
 
-    // Update widget revenue if attributed
     if (widget_id) {
-      const { data: widget } = await supabase
-        .from("widgets")
-        .select("revenue_attributed")
-        .eq("id", widget_id)
-        .single();
-
-      if (widget) {
-        await supabase
-          .from("widgets")
-          .update({
-            revenue_attributed: (widget.revenue_attributed || 0) + amount,
-          })
-          .eq("id", widget_id);
-      }
+      await supabase.rpc("increment_widget_revenue", {
+        p_widget_id: widget_id,
+        p_amount: amount,
+      });
     }
 
-    // Log activity
     await supabase.from("activity_log").insert({
-      user_id,
+      user_id: userId,
       action: "revenue_tracked",
       entity_type: testimonial_id ? "testimonial" : widget_id ? "widget" : "manual",
       entity_id: testimonial_id || widget_id,
