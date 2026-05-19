@@ -3,10 +3,16 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, stripe-signature",
 };
 
-// Verify Stripe webhook signature
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 async function verifyStripeSignature(
   payload: string,
   signature: string,
@@ -18,6 +24,12 @@ async function verifyStripeSignature(
   const v1Signature = parts.find((p) => p.startsWith("v1="))?.split("=")[1];
 
   if (!timestamp || !v1Signature) return false;
+
+  // Replay protection: reject if timestamp is more than 300s old
+  const ts = parseInt(timestamp, 10);
+  if (!Number.isFinite(ts)) return false;
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - ts) > 300) return false;
 
   const signedPayload = `${timestamp}.${payload}`;
   const key = await crypto.subtle.importKey(
@@ -36,7 +48,7 @@ async function verifyStripeSignature(
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
-  return expectedSignature === v1Signature;
+  return timingSafeEqual(expectedSignature, v1Signature);
 }
 
 serve(async (req) => {
@@ -46,18 +58,30 @@ serve(async (req) => {
 
   try {
     const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+    if (!STRIPE_WEBHOOK_SECRET) {
+      console.error("STRIPE_WEBHOOK_SECRET is not configured");
+      return new Response(
+        JSON.stringify({ error: "Webhook secret not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const signature = req.headers.get("stripe-signature");
     const payload = await req.text();
 
-    // Verify webhook signature if secret is configured
-    if (STRIPE_WEBHOOK_SECRET && signature) {
-      const isValid = await verifyStripeSignature(payload, signature, STRIPE_WEBHOOK_SECRET);
-      if (!isValid) {
-        return new Response(
-          JSON.stringify({ error: "Invalid signature" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+    if (!signature) {
+      return new Response(
+        JSON.stringify({ error: "Missing stripe-signature header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const isValid = await verifyStripeSignature(payload, signature, STRIPE_WEBHOOK_SECRET);
+    if (!isValid) {
+      return new Response(
+        JSON.stringify({ error: "Invalid signature" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const event = JSON.parse(payload);
@@ -75,13 +99,27 @@ serve(async (req) => {
         const customerEmail = session.customer_email || session.receipt_email;
         const metadata = session.metadata || {};
 
-        // Check for testimonial/widget attribution
         const testimonialId = metadata.testimonial_id;
         const widgetId = metadata.widget_id;
         const userId = metadata.user_id;
 
         if (userId && amount > 0) {
-          // Create revenue event
+          const paymentId = session.payment_intent || session.id;
+
+          // Idempotency check
+          const { data: existing } = await supabase
+            .from("revenue_events")
+            .select("id")
+            .eq("stripe_payment_id", paymentId)
+            .maybeSingle();
+          if (existing) {
+            console.log("Duplicate webhook for", paymentId, "— skipping");
+            return new Response(
+              JSON.stringify({ received: true, duplicate: true }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
           await supabase.from("revenue_events").insert({
             user_id: userId,
             testimonial_id: testimonialId || null,
@@ -90,50 +128,26 @@ serve(async (req) => {
             currency: session.currency?.toUpperCase() || "USD",
             source: "stripe",
             customer_email: customerEmail,
-            stripe_payment_id: session.payment_intent || session.id,
+            stripe_payment_id: paymentId,
             metadata: {
               event_type: event.type,
               session_id: session.id,
             },
           });
 
-          // Update testimonial revenue if attributed
           if (testimonialId) {
-            const { data: testimonial } = await supabase
-              .from("testimonials")
-              .select("revenue_attributed")
-              .eq("id", testimonialId)
-              .single();
-
-            if (testimonial) {
-              await supabase
-                .from("testimonials")
-                .update({
-                  revenue_attributed: (testimonial.revenue_attributed || 0) + amount,
-                })
-                .eq("id", testimonialId);
-            }
+            await supabase.rpc("increment_testimonial_revenue", {
+              p_testimonial_id: testimonialId,
+              p_amount: amount,
+            });
           }
-
-          // Update widget revenue if attributed
           if (widgetId) {
-            const { data: widget } = await supabase
-              .from("widgets")
-              .select("revenue_attributed")
-              .eq("id", widgetId)
-              .single();
-
-            if (widget) {
-              await supabase
-                .from("widgets")
-                .update({
-                  revenue_attributed: (widget.revenue_attributed || 0) + amount,
-                })
-                .eq("id", widgetId);
-            }
+            await supabase.rpc("increment_widget_revenue", {
+              p_widget_id: widgetId,
+              p_amount: amount,
+            });
           }
 
-          // Log activity
           await supabase.from("activity_log").insert({
             user_id: userId,
             action: "revenue_attributed",

@@ -1,22 +1,22 @@
 project_id = "ldniwvyjycerpdlwhntu"
 
 [functions.generate-content]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ai-interview]
-verify_jwt = false
+verify_jwt = true
 
 [functions.analyze-testimonial]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-sms]
-verify_jwt = false
+verify_jwt = true
 
 [functions.stripe-webhook]
 verify_jwt = false
 
 [functions.track-revenue]
-verify_jwt = false
+verify_jwt = true
 
 [functions.submit-testimonial]
 verify_jwt = false

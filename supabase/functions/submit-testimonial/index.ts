@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { 
+    let {
       form_slug,
       content,
       rating,
@@ -31,6 +31,52 @@ serve(async (req) => {
         JSON.stringify({ error: "form_slug and author_name are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    const bad = (msg: string) =>
+      new Response(JSON.stringify({ error: msg }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+
+    if (typeof author_name !== "string") return bad("author_name must be a string");
+    author_name = author_name.trim();
+    if (author_name.length < 1 || author_name.length > 120) return bad("author_name must be 1..120 chars");
+
+    if (content !== undefined && content !== null) {
+      if (typeof content !== "string") return bad("content must be a string");
+      content = content.trim();
+      if (content.length < 1 || content.length > 5000) return bad("content must be 1..5000 chars");
+    }
+
+    if (author_email !== undefined && author_email !== null && author_email !== "") {
+      if (typeof author_email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(author_email)) {
+        return bad("author_email is invalid");
+      }
+      author_email = author_email.toLowerCase();
+    }
+
+    if (video_url && (typeof video_url !== "string" || !video_url.startsWith("https://"))) {
+      return bad("video_url must start with https://");
+    }
+    if (audio_url && (typeof audio_url !== "string" || !audio_url.startsWith("https://"))) {
+      return bad("audio_url must start with https://");
+    }
+
+    if (!["text", "video", "audio"].includes(type)) {
+      return bad("type must be one of text, video, audio");
+    }
+
+    if (rating !== undefined && rating !== null) {
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+        return bad("rating must be an integer 1..5");
+      }
+    }
+
+    if (custom_fields === null || typeof custom_fields !== "object" || Array.isArray(custom_fields)) {
+      return bad("custom_fields must be a plain object");
+    }
+    if (JSON.stringify(custom_fields).length > 4096) {
+      return bad("custom_fields too large");
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;

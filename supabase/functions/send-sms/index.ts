@@ -12,8 +12,59 @@ serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const authClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData, error: userError } = await authClient.auth.getUser();
+    if (userError || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const userId = userData.user.id;
+
     const { to, message, campaign_id } = await req.json();
-    
+
+    if (!to || typeof to !== "string" || !/^\+[1-9]\d{1,14}$/.test(to)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid phone number (E.164 required)" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (!message || typeof message !== "string" || message.length < 1 || message.length > 1600) {
+      return new Response(
+        JSON.stringify({ error: "Message must be 1..1600 characters" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, serviceKey);
+
+    if (campaign_id) {
+      const { data: c } = await supabase
+        .from("campaigns")
+        .select("id")
+        .eq("id", campaign_id)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!c) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
     const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
     const TWILIO_PHONE_NUMBER = Deno.env.get("TWILIO_PHONE_NUMBER");
@@ -25,16 +76,8 @@ serve(async (req) => {
       );
     }
 
-    if (!to || !message) {
-      return new Response(
-        JSON.stringify({ error: "Phone number and message are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Send SMS via Twilio
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
-    const authHeader = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
+    const twilioAuth = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
 
     const formData = new URLSearchParams();
     formData.append("To", to);
@@ -44,7 +87,7 @@ serve(async (req) => {
     const twilioResponse = await fetch(twilioUrl, {
       method: "POST",
       headers: {
-        "Authorization": `Basic ${authHeader}`,
+        "Authorization": `Basic ${twilioAuth}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: formData.toString(),
@@ -60,20 +103,15 @@ serve(async (req) => {
       );
     }
 
-    // Update campaign stats if campaign_id provided
     if (campaign_id) {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      const supabase = createClient(supabaseUrl, supabaseKey);
-
       await supabase.rpc("increment_campaign_sent", { campaign_id });
     }
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         message_sid: twilioData.sid,
-        status: twilioData.status 
+        status: twilioData.status,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
