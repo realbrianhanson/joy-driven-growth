@@ -234,7 +234,7 @@ const Analytics = () => {
                         Last {dateRange === "today" ? "24 hours" : dateRange} • vs previous period
                       </p>
 
-                      <div className="grid grid-cols-3 gap-4 mt-6">
+                      <div className="grid grid-cols-2 gap-4 mt-6">
                         <div className="p-3 rounded-lg bg-secondary/50">
                           <p className="text-xs text-muted-foreground">Conversions</p>
                           <p className="text-xl font-semibold text-foreground">{conversionCount}</p>
