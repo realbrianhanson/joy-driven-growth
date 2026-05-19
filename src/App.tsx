@@ -27,7 +27,6 @@ const WallOfLove = lazy(() => import("./pages/WallOfLove"));
 const WallBuilder = lazy(() => import("./pages/WallBuilder"));
 const ContentStudio = lazy(() => import("./pages/ContentStudio"));
 const ContentLibrary = lazy(() => import("./pages/ContentLibrary"));
-const VideoEditor = lazy(() => import("./pages/VideoEditor"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const SettingsGeneral = lazy(() => import("./pages/SettingsGeneral"));
 const SettingsTeam = lazy(() => import("./pages/SettingsTeam"));
@@ -35,7 +34,6 @@ const SettingsIntegrations = lazy(() => import("./pages/SettingsIntegrations"));
 const SettingsBilling = lazy(() => import("./pages/SettingsBilling"));
 const SettingsApi = lazy(() => import("./pages/SettingsApi"));
 const AgencyDashboard = lazy(() => import("./pages/AgencyDashboard"));
-const ChromeExtension = lazy(() => import("./pages/ChromeExtension"));
 const PublicWall = lazy(() => import("./pages/PublicWall"));
 const EmbedWidget = lazy(() => import("./pages/EmbedWidget"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -90,7 +88,6 @@ const AnimatedRoutes = () => {
         <Route path="/dashboard/walls/:id" element={<DashboardRoute><WallBuilder /></DashboardRoute>} />
         <Route path="/dashboard/content" element={<DashboardRoute><ContentStudio /></DashboardRoute>} />
         <Route path="/dashboard/content/library" element={<DashboardRoute><ContentLibrary /></DashboardRoute>} />
-        <Route path="/dashboard/content/video-editor" element={<DashboardRoute><VideoEditor /></DashboardRoute>} />
         <Route path="/dashboard/analytics" element={<DashboardRoute><Analytics /></DashboardRoute>} />
         <Route path="/dashboard/settings" element={<DashboardRoute><SettingsGeneral /></DashboardRoute>} />
         <Route path="/dashboard/settings/team" element={<DashboardRoute><SettingsTeam /></DashboardRoute>} />
@@ -98,7 +95,6 @@ const AnimatedRoutes = () => {
         <Route path="/dashboard/settings/billing" element={<DashboardRoute><SettingsBilling /></DashboardRoute>} />
         <Route path="/dashboard/settings/api" element={<DashboardRoute><SettingsApi /></DashboardRoute>} />
         <Route path="/dashboard/agency" element={<DashboardRoute><AgencyDashboard /></DashboardRoute>} />
-        <Route path="/dashboard/extension" element={<DashboardRoute><ChromeExtension /></DashboardRoute>} />
 
         <Route path="*" element={<Suspense fallback={<PageLoader />}><NotFound /></Suspense>} />
       </Routes>
