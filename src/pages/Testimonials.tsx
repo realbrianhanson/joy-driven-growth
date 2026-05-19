@@ -111,6 +111,7 @@ export default function Testimonials() {
   const approveMutation = useApproveTestimonial();
   const updateMutation = useUpdateTestimonial();
   const deleteMutation = useDeleteTestimonial();
+  const rejectMutation = useRejectTestimonial();
 
   // Map DB data to card shape
   const realTestimonials = useMemo(
@@ -202,6 +203,72 @@ export default function Testimonials() {
         toast({ title: "Failed to approve", variant: "destructive" });
       },
     });
+  };
+
+  const handleReject = (id: string) => {
+    if (isDemoMode) {
+      toast({ title: "Testimonial rejected" });
+      handleCloseDetail();
+      return;
+    }
+    rejectMutation.mutate(id, {
+      onSuccess: () => {
+        toast({ title: "Testimonial rejected" });
+        handleCloseDetail();
+      },
+      onError: () => toast({ title: "Failed to reject", variant: "destructive" }),
+    });
+  };
+
+  const handleGenerateContent = async (type: string) => {
+    if (!selectedTestimonial) return;
+    if (isDemoMode) {
+      toast({ title: `Generating ${type} content...` });
+      return;
+    }
+    if (!user) return;
+    const typeMap: Record<string, { id: string; title: string; subtitle: string; dbType: string }> = {
+      twitter:   { id: "twitter",   title: "Twitter Thread",  subtitle: "Viral thread",       dbType: "twitter_thread" },
+      linkedin:  { id: "linkedin",  title: "LinkedIn Post",   subtitle: "Professional post",  dbType: "linkedin_post" },
+      graphic:   { id: "quote",     title: "Quote Graphic",   subtitle: "Shareable quote",    dbType: "quote_graphic" },
+      casestudy: { id: "casestudy", title: "Case Study",      subtitle: "Mini success story", dbType: "case_study" },
+      clip:      { id: "casestudy", title: "Video Highlight", subtitle: "Best moment",        dbType: "video_highlight" },
+    };
+    const info = typeMap[type];
+    if (!info) return;
+    toast({ title: `Generating ${info.title}...` });
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-content", {
+        body: {
+          testimonials: [{
+            id: selectedTestimonial.id,
+            name: selectedTestimonial.name,
+            company: selectedTestimonial.company,
+            content: selectedTestimonial.content,
+            rating: selectedTestimonial.rating,
+            revenue: selectedTestimonial.revenue ?? 0,
+          }],
+          contentType: info.id,
+          contentTypeInfo: { title: info.title, subtitle: info.subtitle },
+        },
+      });
+      if (error) throw error;
+      const generated = (data as { content?: string })?.content;
+      if (!generated) throw new Error("No content returned");
+
+      await supabase.from("generated_content").insert({
+        user_id: user.id,
+        testimonial_ids: [selectedTestimonial.id],
+        type: info.dbType as never,
+        content: generated,
+      });
+
+      toast({ title: `${info.title} saved`, description: "View it in Content Library." });
+      navigate("/dashboard/content/library");
+    } catch (err) {
+      console.error("Generate content error:", err);
+      toast({ title: "Failed to generate content", description: err instanceof Error ? err.message : undefined, variant: "destructive" });
+    }
   };
 
   const handleFeature = (id: string) => {
