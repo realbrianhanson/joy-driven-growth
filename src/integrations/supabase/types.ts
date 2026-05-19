@@ -627,8 +627,20 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_campaign_sent: {
+        Args: { campaign_id: string }
+        Returns: undefined
+      }
       increment_form_submissions: {
         Args: { form_id: string }
+        Returns: undefined
+      }
+      increment_testimonial_revenue: {
+        Args: { p_amount: number; p_testimonial_id: string }
+        Returns: undefined
+      }
+      increment_widget_revenue: {
+        Args: { p_amount: number; p_widget_id: string }
         Returns: undefined
       }
     }
