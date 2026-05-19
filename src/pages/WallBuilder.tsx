@@ -22,6 +22,14 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 
+const colClassMap: Record<number, string> = {
+  1: "grid-cols-1",
+  2: "grid-cols-1 sm:grid-cols-2",
+  3: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
+  4: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4",
+  5: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-5",
+};
+
 const WallBuilder = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -41,6 +49,26 @@ const WallBuilder = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [device, setDevice] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [isSaving, setIsSaving] = useState(false);
+  const [slugTaken, setSlugTaken] = useState(false);
+  const [checkingSlug, setCheckingSlug] = useState(false);
+
+  useEffect(() => {
+    if (!slug || slug.length < 3) {
+      setSlugTaken(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setCheckingSlug(true);
+      const { data } = await supabase
+        .from("walls")
+        .select("id, user_id")
+        .eq("slug", slug)
+        .maybeSingle();
+      setCheckingSlug(false);
+      setSlugTaken(!!data && data.id !== id);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [slug, id]);
 
   const [openSections, setOpenSections] = useState({
     settings: true, branding: true, layout: true, testimonials: true,
@@ -106,6 +134,10 @@ const WallBuilder = () => {
   const handleSave = async () => {
     if (!user || !wallName.trim() || !slug.trim()) {
       toast.error('Please fill in name and slug');
+      return;
+    }
+    if (slugTaken) {
+      toast.error('That URL is already taken. Please pick a different slug.');
       return;
     }
     setIsSaving(true);
@@ -188,6 +220,8 @@ const WallBuilder = () => {
                         <Input value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''))} placeholder="my-wall" className="flex-1" />
                         <Button variant="outline" size="sm" onClick={copyLink}><Copy className="w-4 h-4" /></Button>
                       </div>
+                      {checkingSlug && <p className="text-xs text-muted-foreground mt-1">Checking availability…</p>}
+                      {slugTaken && <p className="text-xs text-destructive mt-1">This URL is taken — try a different one.</p>}
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
@@ -335,8 +369,8 @@ const WallBuilder = () => {
                   <div className={`grid gap-4 ${
                     layout === 'list' ? 'grid-cols-1' :
                     device === 'mobile' ? 'grid-cols-1' :
-                    device === 'tablet' ? 'grid-cols-2' :
-                    `grid-cols-${Math.min(columns[0], 3)}`
+                    device === 'tablet' ? 'grid-cols-1 sm:grid-cols-2' :
+                    (colClassMap[Math.min(columns[0], 3)] ?? colClassMap[3])
                   }`}>
                     {selectedData.length === 0 ? (
                       <div className="col-span-full text-center py-16 text-muted-foreground">
