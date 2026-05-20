@@ -176,6 +176,12 @@ export function useDashboard() {
       ? (rated.reduce((s, t) => s + (t.rating ?? 0), 0) / rated.length).toFixed(1)
       : "0";
 
+    // Collection rate = approved testimonials / total collected
+    const approvedCount = allTestimonials.filter((t) => t.status === "approved").length;
+    const collectionRate = allTestimonials.length > 0
+      ? Math.round((approvedCount / allTestimonials.length) * 100)
+      : null;
+
     // Widget CTR
     const allWidgets = widgets.data ?? [];
     const totalImpressions = allWidgets.reduce((s, w) => s + (w.impressions ?? 0), 0);
@@ -242,6 +248,8 @@ export function useDashboard() {
       testimonialsTrend,
       thisWeekCount,
       avgRating,
+      collectionRate,
+      approvedCount,
       widgetCTR: `${widgetCTR}%`,
       revenueThisMonth,
       revenueTrend,

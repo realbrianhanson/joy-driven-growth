@@ -92,6 +92,14 @@ export default function Dashboard() {
   const insights = isDemoMode ? MOCK_INSIGHTS : [];
   const drivers = isDemoMode ? MOCK_REVENUE_DRIVERS : real.drivers;
   const hasTestimonials = isDemoMode ? true : real.hasTestimonials;
+  const collectionRate = isDemoMode
+    ? { value: "68%", highlight: "vs 34% industry avg" }
+    : real.collectionRate != null
+      ? {
+          value: `${real.collectionRate}%`,
+          highlight: `${real.approvedCount} of ${real.totalTestimonials} approved`,
+        }
+      : { value: "—", highlight: undefined };
 
   return (
     <motion.div
@@ -125,7 +133,7 @@ export default function Dashboard() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard icon={MessageSquare} title="Testimonials Collected" value={totalTestimonials} trend={{ value: testimonialsTrend, label: "vs last month" }} subtitle={`${thisWeekCount} new this week`} delay={0} />
-          <StatCard icon={TrendingUp} title="Collection Rate" value={hasTestimonials ? "68%" : "—"} highlight={hasTestimonials ? "vs 34% industry avg" : undefined} animateValue={false} delay={80} />
+          <StatCard icon={TrendingUp} title="Collection Rate" value={collectionRate.value} highlight={collectionRate.highlight} animateValue={false} delay={80} />
           <StatCard icon={Smile} title="Happiness Score" value={hasTestimonials ? avgRating : "—"} highlight={hasTestimonials ? "Clients love you" : undefined} animateValue={false} delay={160} />
           <StatCard icon={Eye} title="Widget Performance" value={widgetCTR} subtitle="CTR this month" animateValue={false} delay={240} />
         </div>
