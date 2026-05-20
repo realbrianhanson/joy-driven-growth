@@ -170,15 +170,16 @@ export default function CampaignBuilder() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="border-b border-border bg-card sticky top-0 z-50">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard/campaigns")}>
-              <ArrowLeft className="w-4 h-4 mr-1" /> Back
+        <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <Button variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground hover:text-foreground" onClick={() => navigate("/dashboard/campaigns")}>
+              <ArrowLeft className="w-4 h-4 mr-1" /> Campaigns
             </Button>
-            <h1 className="text-xl font-semibold text-foreground">New SMS Campaign</h1>
+            <span className="text-border" aria-hidden>/</span>
+            <h1 className="text-[15px] font-semibold text-foreground truncate">New SMS Campaign</h1>
           </div>
-          <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={isSaving || !campaignName.trim()}>
-            {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+          <Button variant="outline" size="sm" className="h-8" onClick={handleSaveDraft} disabled={isSaving || !campaignName.trim()}>
+            {isSaving && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
             Save Draft
           </Button>
         </div>
