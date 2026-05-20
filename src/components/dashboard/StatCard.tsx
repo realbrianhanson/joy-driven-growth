@@ -26,7 +26,7 @@ export function StatCard({
   highlight,
   animateValue = true,
   delay = 0,
-  accentColor = "bg-primary",
+  accentColor,
 }: StatCardProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [displayValue, setDisplayValue] = useState(animateValue && typeof value === 'number' ? 0 : value);
@@ -64,13 +64,11 @@ export function StatCard({
       }`}
       style={{ animationDelay: `${delay}ms` }}
     >
-      {/* Top accent border */}
-      <div className={`absolute top-0 left-0 right-0 h-[3px] ${accentColor}`} />
-      <CardContent className="p-5 pt-6">
-        <div className="flex items-start justify-between mb-3">
-          <Icon className="h-5 w-5 text-muted-foreground" />
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between mb-4">
+          <Icon className="h-4 w-4 text-muted-foreground" strokeWidth={1.75} />
           {trend && (
-            <div className={`flex items-center gap-1 text-xs font-medium ${
+            <div className={`flex items-center gap-1 text-xs font-semibold tabular-nums ${
               trend.value >= 0 ? 'text-success' : 'text-destructive'
             }`}>
               {trend.value >= 0 ? (
@@ -82,23 +80,23 @@ export function StatCard({
             </div>
           )}
         </div>
-        
-        <div className="text-2xl font-bold text-foreground mb-0.5">
+
+        <div className="text-2xl font-bold text-foreground tracking-tight tabular-nums mb-1">
           {displayValue}
         </div>
 
-        <h3 className="text-sm text-muted-foreground mb-1">
+        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-tight">
           {title}
         </h3>
-        
+
         {subtitle && (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[11px] text-muted-foreground mt-1.5">
             {subtitle}
           </p>
         )}
-        
+
         {highlight && (
-          <p className="text-xs font-medium text-primary mt-1.5">
+          <p className="text-[11px] font-medium text-primary mt-1.5">
             {highlight}
           </p>
         )}
