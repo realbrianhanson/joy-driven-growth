@@ -148,8 +148,7 @@ const ContentStudio = () => {
     toast.success('Copied to clipboard!');
   };
 
-  // Reset variants when source/format changes
-  const resetAndSet = (fn: () => void) => { setVariants([]); setActiveVariant(0); fn(); };
+
 
   return (
     <div className="min-h-screen bg-background">
