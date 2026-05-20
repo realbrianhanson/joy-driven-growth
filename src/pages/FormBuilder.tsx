@@ -16,6 +16,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useForm as useFormData, useCreateForm, useUpdateForm } from "@/hooks/use-forms";
 import { supabase } from "@/integrations/supabase/client";
+import { FORM_TEMPLATES, PURPOSE_LABELS, type QuestionPurpose, type TemplateQuestion } from "@/lib/form-templates";
+import { DEFAULT_CONSENT_TEMPLATE } from "@/lib/consent";
 
 interface Question {
   id: string;
@@ -23,6 +25,7 @@ interface Question {
   question: string;
   placeholder?: string;
   helpText?: string;
+  purpose?: QuestionPurpose;
   required: boolean;
 }
 
@@ -53,6 +56,9 @@ interface FormSettings {
   positiveThreshold: number;
   positiveAction: string;
   negativeAction: string;
+  consentEnabled: boolean;
+  consentText: string;
+  nameDisplayEnabled: boolean;
 }
 
 const defaultQuestions: Question[] = [
@@ -86,6 +92,9 @@ const defaultSettings: FormSettings = {
   positiveThreshold: 4,
   positiveAction: "google",
   negativeAction: "support@example.com",
+  consentEnabled: true,
+  consentText: DEFAULT_CONSENT_TEMPLATE,
+  nameDisplayEnabled: true,
 };
 
 const questionTypes = [
@@ -176,6 +185,7 @@ export default function FormBuilder() {
   const [initialized, setInitialized] = useState(isNew);
   const [slugTaken, setSlugTaken] = useState(false);
   const [checkingSlug, setCheckingSlug] = useState(false);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(isNew);
 
   useEffect(() => {
     const slug = settings.slug;
@@ -228,6 +238,9 @@ export default function FormBuilder() {
         positiveThreshold: routing.positive_threshold ?? 4,
         positiveAction: routing.positive_action ?? "google",
         negativeAction: routing.negative_action ?? "support@example.com",
+        consentEnabled: persisted.consent_enabled ?? true,
+        consentText: persisted.consent_text ?? DEFAULT_CONSENT_TEMPLATE,
+        nameDisplayEnabled: persisted.name_display_enabled ?? true,
       });
       if (cq?.questions && Array.isArray(cq.questions)) {
         setQuestions(cq.questions);
@@ -275,6 +288,9 @@ export default function FormBuilder() {
             positive_action: settings.positiveAction,
             negative_action: settings.negativeAction,
           },
+          consent_enabled: settings.consentEnabled,
+          consent_text: settings.consentText,
+          name_display_enabled: settings.nameDisplayEnabled,
         },
       })),
     };
@@ -330,6 +346,51 @@ export default function FormBuilder() {
         <div className="space-y-4 w-full max-w-md">
           <Skeleton className="h-8 w-48 mx-auto" />
           <Skeleton className="h-64 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (isNew && showTemplatePicker) {
+    const pickTemplate = (tplId: string) => {
+      const tpl = FORM_TEMPLATES.find((t) => t.id === tplId) ?? FORM_TEMPLATES[FORM_TEMPLATES.length - 1];
+      const qs: Question[] = tpl.questions.map((q: TemplateQuestion) => ({
+        id: q.id,
+        type: q.type,
+        question: q.question,
+        placeholder: q.placeholder,
+        helpText: q.helpText,
+        purpose: q.purpose,
+        required: q.required,
+      }));
+      setQuestions(qs);
+      setSettings((s) => ({ ...s, name: tpl.name === "Blank Form" ? "New Collection Form" : tpl.name }));
+      setShowTemplatePicker(false);
+    };
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-3xl mx-auto">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard/forms")} className="mb-4">
+            <ArrowLeft className="w-4 h-4 mr-1" /> Forms
+          </Button>
+          <h1 className="text-2xl font-semibold text-foreground mb-2">Start a new form</h1>
+          <p className="text-sm text-muted-foreground mb-6">Pick a template — these are designed to pull honest, context-rich answers that work as testimonials.</p>
+          <div className="grid gap-3">
+            {FORM_TEMPLATES.map((tpl) => (
+              <button
+                key={tpl.id}
+                onClick={() => pickTemplate(tpl.id)}
+                className="text-left p-5 rounded-xl border border-border hover:border-primary/40 bg-card transition-colors"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="font-semibold text-foreground">{tpl.name}</h3>
+                  {tpl.recommended && <Badge variant="default">Recommended</Badge>}
+                </div>
+                <p className="text-sm text-muted-foreground">{tpl.description}</p>
+                <p className="text-xs text-muted-foreground mt-2">{tpl.questions.length} question{tpl.questions.length === 1 ? "" : "s"}</p>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     );
