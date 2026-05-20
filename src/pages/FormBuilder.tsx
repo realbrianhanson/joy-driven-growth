@@ -98,6 +98,51 @@ const questionTypes = [
   { type: "sentiment", icon: "☺", label: "Sentiment" },
 ];
 
+function SortableQuestionRow({
+  q,
+  icon,
+  selected,
+  onSelect,
+  onDelete,
+}: {
+  q: Question;
+  icon?: string;
+  selected: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: q.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      onClick={onSelect}
+      className={`p-3 rounded-lg border cursor-pointer transition-colors flex items-center gap-3 ${selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"}`}
+    >
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        onClick={(e) => e.stopPropagation()}
+        className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
+        aria-label="Drag to reorder"
+      >
+        <GripVertical className="w-4 h-4" />
+      </button>
+      <span className="text-sm font-medium text-muted-foreground">{icon}</span>
+      <span className="flex-1 text-sm truncate">{q.question}</span>
+      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => { e.stopPropagation(); onDelete(); }}>
+        <Trash2 className="w-3 h-3" />
+      </Button>
+    </div>
+  );
+}
+
 export default function FormBuilder() {
   const navigate = useNavigate();
   const { id } = useParams();
