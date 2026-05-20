@@ -35,47 +35,44 @@ export const RevenueHeroCard = forwardRef<HTMLDivElement, RevenueHeroCardProps>(
 
   return (
     <Card ref={ref} className="relative overflow-hidden">
-      <div className="absolute top-0 left-0 right-0 h-[3px] bg-warning" />
-      <CardContent className="p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-primary" />
+      <CardContent className="p-8">
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="h-4 w-4 text-warning" />
-              <h2 className="text-sm font-medium text-muted-foreground">Revenue Influenced</h2>
+            <div className="flex items-center gap-2 mb-4 text-primary">
+              <DollarSign className="h-4 w-4" />
+              <h2 className="text-xs font-semibold uppercase tracking-wider">Revenue Influenced</h2>
             </div>
-            
-            <div className="text-4xl md:text-5xl font-bold text-foreground tracking-tight mb-2">
-              {formatCurrency(displayRevenue)}
-            </div>
-            
-            <p className="text-sm text-muted-foreground mb-3">
-              From testimonials {period}
-            </p>
-            
-            <div className="flex items-center gap-2">
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border ${
-                trend >= 0 
-                  ? 'bg-success-light text-success border-success/20' 
-                  : 'bg-destructive-light text-destructive border-destructive/20'
-              }`}>
-                <TrendingUp className={`w-3 h-3 ${trend < 0 ? 'rotate-180' : ''}`} />
+
+            <div className="flex items-baseline gap-3 mb-1">
+              <div className="text-4xl md:text-5xl font-bold text-foreground tracking-tight tabular-nums">
+                {formatCurrency(displayRevenue)}
+              </div>
+              <span className={`text-sm font-medium tabular-nums ${trend >= 0 ? 'text-success' : 'text-destructive'}`}>
                 {trend >= 0 ? '+' : ''}{trend}% vs last month
               </span>
             </div>
+
+            <p className="text-sm text-muted-foreground">
+              From testimonials {period}
+            </p>
           </div>
-          
+
           <div className="flex flex-col items-end gap-3">
-            <div className="w-full lg:w-56 h-20 bg-surface-subtle rounded-lg flex items-end justify-around px-3 pb-2 gap-1">
-              {[40, 55, 45, 70, 60, 85, 75, 95].map((height, i) => (
-                <div
-                  key={i}
-                  className="w-5 rounded-t bg-primary/70"
-                  style={{ height: `${height}%` }}
-                />
-              ))}
+            <div className="flex items-end gap-1.5 h-24">
+              {[40, 55, 48, 70, 60, 85, 95].map((height, i, arr) => {
+                const opacity = 0.15 + (i / (arr.length - 1)) * 0.85;
+                return (
+                  <div
+                    key={i}
+                    className="w-5 rounded-t-sm bg-primary"
+                    style={{ height: `${height}%`, opacity }}
+                  />
+                );
+              })}
             </div>
-            
-            <button className="group flex items-center gap-1.5 text-sm text-primary font-medium hover:gap-2.5 transition-all duration-150">
+
+            <button className="group flex items-center gap-1.5 text-xs font-semibold text-primary uppercase tracking-wider hover:gap-2.5 transition-all duration-150">
               View details
               <ArrowRight className="w-3.5 h-3.5" />
             </button>

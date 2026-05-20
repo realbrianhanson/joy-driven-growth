@@ -98,7 +98,7 @@ export default function Dashboard() {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="max-w-6xl mx-auto px-6 py-8"
+      className="max-w-6xl mx-auto px-6 py-10 space-y-8"
     >
       <WelcomeHeader
         name={firstName}
@@ -112,37 +112,35 @@ export default function Dashboard() {
 
       {/* Revenue hero */}
       {isLoading ? (
-        <div className="mb-6"><RevenueSkeleton /></div>
+        <RevenueSkeleton />
       ) : (
-        <div className="mb-6">
-          <RevenueHeroCard revenue={revenueThisMonth} trend={revenueTrend} period="this month" />
-        </div>
+        <RevenueHeroCard revenue={revenueThisMonth} trend={revenueTrend} period="this month" />
       )}
 
       {/* Stat cards */}
       {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => <StatSkeleton key={i} />)}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard icon={MessageSquare} title="Testimonials Collected" value={totalTestimonials} trend={{ value: testimonialsTrend, label: "vs last month" }} subtitle={`${thisWeekCount} new this week`} delay={0} />
-          <StatCard icon={TrendingUp} title="Collection Rate" value={hasTestimonials ? "68%" : "—"} highlight={hasTestimonials ? "vs 34% industry avg" : undefined} animateValue={false} delay={80} accentColor="bg-success" />
-          <StatCard icon={Smile} title="Happiness Score" value={hasTestimonials ? avgRating : "—"} highlight={hasTestimonials ? "Clients love you" : undefined} animateValue={false} delay={160} accentColor="bg-warning" />
+          <StatCard icon={TrendingUp} title="Collection Rate" value={hasTestimonials ? "68%" : "—"} highlight={hasTestimonials ? "vs 34% industry avg" : undefined} animateValue={false} delay={80} />
+          <StatCard icon={Smile} title="Happiness Score" value={hasTestimonials ? avgRating : "—"} highlight={hasTestimonials ? "Clients love you" : undefined} animateValue={false} delay={160} />
           <StatCard icon={Eye} title="Widget Performance" value={widgetCTR} subtitle="CTR this month" animateValue={false} delay={240} />
         </div>
       )}
 
       {/* Revenue drivers */}
       {isLoading ? (
-        <div className="mb-6"><FeedSkeleton /></div>
+        <FeedSkeleton />
       ) : drivers.length > 0 ? (
-        <div className="mb-6"><RevenueDrivers drivers={drivers} /></div>
+        <RevenueDrivers drivers={drivers} />
       ) : null}
 
       {/* Recent testimonials */}
       {isLoading ? (
-        <div className="mb-6">
+        <div>
           <Skeleton className="h-4 w-36 mb-3" />
           <div className="flex gap-4">
             {[1, 2, 3].map((i) => (
@@ -163,15 +161,13 @@ export default function Dashboard() {
           </div>
         </div>
       ) : testimonials.length > 0 ? (
-        <div className="mb-6"><RecentTestimonials testimonials={testimonials} /></div>
+        <RecentTestimonials testimonials={testimonials} />
       ) : !isDemoMode ? (
-        <div className="mb-6">
-          <EmptyState type="testimonials" onAction={() => navigate("/dashboard/forms")} />
-        </div>
+        <EmptyState type="testimonials" onAction={() => navigate("/dashboard/forms")} />
       ) : null}
 
       {/* Quick actions */}
-      <div className="mb-6"><QuickActions /></div>
+      <QuickActions />
 
       {/* Activity + insights */}
       {isLoading ? (
