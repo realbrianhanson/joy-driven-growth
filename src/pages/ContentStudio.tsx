@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import ContentRenderer, { flattenContent } from "@/components/content/ContentRenderer";
 
 interface ContentType {
   id: string;
@@ -37,6 +38,11 @@ const contentTypes: ContentType[] = [
   { id: 'avatar', Icon: Bot, title: 'AI Avatar Video', subtitle: 'Text becomes video', category: 'video', isPro: true, dbType: 'ai_avatar' },
 ];
 
+interface GeneratedResult {
+  contentType: string;
+  data: any;
+}
+
 const ContentStudio = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
@@ -44,7 +50,8 @@ const ContentStudio = () => {
   const [selectedTestimonials, setSelectedTestimonials] = useState<string[]>([]);
   const [selectedContentType, setSelectedContentType] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedContent, setGeneratedContent] = useState<string | null>(null);
+  const [variants, setVariants] = useState<GeneratedResult[]>([]);
+  const [activeVariant, setActiveVariant] = useState(0);
 
   // Fetch real testimonials
   const { data: testimonials = [], isLoading } = useQuery({
@@ -85,7 +92,6 @@ const ContentStudio = () => {
   const generateContent = async () => {
     if (selectedTestimonials.length === 0 || !selectedContentType || !user) return;
     setIsGenerating(true);
-    setGeneratedContent(null);
 
     try {
       const selectedData = testimonials.filter(t => selectedTestimonials.includes(t.id));
@@ -107,15 +113,23 @@ const ContentStudio = () => {
       });
 
       if (error) throw error;
-      const content = data.content;
-      setGeneratedContent(content);
+      const result: GeneratedResult = {
+        contentType: data.contentType || selectedContentType,
+        data: data.content,
+      };
+      // Keep up to 3 variants
+      setVariants(prev => {
+        const next = [...prev, result].slice(-3);
+        setActiveVariant(next.length - 1);
+        return next;
+      });
 
       // Save to generated_content
       await supabase.from('generated_content').insert({
         user_id: user.id,
         testimonial_ids: selectedTestimonials,
         type: contentTypeInfo?.dbType as any,
-        content,
+        content: JSON.stringify(result.data),
       });
 
       toast.success('Content generated and saved');
@@ -127,12 +141,14 @@ const ContentStudio = () => {
     }
   };
 
+  const current = variants[activeVariant] || null;
   const copyContent = () => {
-    if (generatedContent) {
-      navigator.clipboard.writeText(generatedContent);
-      toast.success('Copied to clipboard!');
-    }
+    if (!current) return;
+    navigator.clipboard.writeText(flattenContent(current.contentType, current.data));
+    toast.success('Copied to clipboard!');
   };
+
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -255,7 +271,7 @@ const ContentStudio = () => {
                 <Button
                   className="w-full mt-5 h-9"
                   disabled={selectedTestimonials.length === 0 || !selectedContentType || isGenerating}
-                  onClick={generateContent}
+                  onClick={() => { setVariants([]); setActiveVariant(0); generateContent(); }}
                 >
                   {isGenerating ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" />Generating…</> : <><Sparkles className="w-4 h-4 mr-1.5" />Generate</>}
                 </Button>
@@ -267,7 +283,7 @@ const ContentStudio = () => {
           <div className="space-y-4">
             <Card className="bg-card border border-border rounded-xl shadow-none min-h-[520px]">
               <CardContent className="p-5 h-full">
-                {!generatedContent && !isGenerating && (
+                {!current && !isGenerating && (
                   <div className="flex flex-col items-center justify-center h-full text-center py-12">
                     <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-light mb-4">
                       <Sparkles className="w-5 h-5 text-primary" />
@@ -283,7 +299,7 @@ const ContentStudio = () => {
                     <p className="text-sm text-muted-foreground">This usually takes a few seconds.</p>
                   </div>
                 )}
-                {generatedContent && !isGenerating && (
+                {current && !isGenerating && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <h3 className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Output</h3>
@@ -292,9 +308,27 @@ const ContentStudio = () => {
                         <Button variant="outline" size="sm" className="h-8" onClick={generateContent}><RefreshCw className="w-3.5 h-3.5 mr-1.5" />Regenerate</Button>
                       </div>
                     </div>
-                    <div className="p-4 rounded-lg bg-muted/40 border border-border whitespace-pre-wrap text-sm text-foreground leading-relaxed">
-                      {generatedContent}
-                    </div>
+                    {variants.length > 1 && (
+                      <div className="flex gap-1">
+                        {variants.map((_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setActiveVariant(i)}
+                            className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                              activeVariant === i ? 'bg-primary-light text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                            }`}
+                          >
+                            Version {i + 1}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <ContentRenderer contentType={current.contentType} data={current.data} />
+                    {variants.length < 3 && (
+                      <Button variant="outline" size="sm" className="h-8 w-full" onClick={generateContent}>
+                        <Sparkles className="w-3.5 h-3.5 mr-1.5" />Generate another version
+                      </Button>
+                    )}
                   </div>
                 )}
               </CardContent>

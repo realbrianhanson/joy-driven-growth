@@ -24,54 +24,42 @@ interface ContentRequest {
   };
 }
 
+const JSON_ONLY = `\n\nRespond with ONLY valid JSON matching the exact schema below. No markdown fences, no commentary, no preamble. Just the JSON object.`;
+
 const getSystemPrompt = (contentType: string): string => {
   const prompts: Record<string, string> = {
-    twitter: `You are an expert social media copywriter who creates viral Twitter threads. 
-Create engaging Twitter threads that:
-- Start with a strong hook that grabs attention
-- Use emojis strategically but not excessively
-- Include numbered tweets for easy reading
-- End with a call to action
-- Keep each tweet under 280 characters
-- Use storytelling to make testimonials relatable`,
+    twitter: `You are an expert social media copywriter who creates viral Twitter threads.
+Write a thread of 5-8 tweets. First tweet must be a strong scroll-stopping hook. Each tweet under 270 characters. Last tweet is a clear CTA. Use emojis sparingly. Storytelling tone.
+Schema: { "tweets": string[], "hashtags": string[] }${JSON_ONLY}`,
 
     linkedin: `You are a LinkedIn content strategist who writes professional, engaging posts.
-Create LinkedIn posts that:
-- Start with a compelling opening line
-- Tell a story that resonates with professionals
-- Use proper formatting with line breaks for readability
-- Include relevant hashtags at the end
-- Maintain a professional yet personable tone
-- End with a thought-provoking question or CTA`,
+Write a hook (one compelling first line), a body with proper \\n line breaks for readability, 3-5 hashtags, and a closing CTA or question.
+Schema: { "hook": string, "body": string, "hashtags": string[], "cta": string }${JSON_ONLY}`,
 
     email: `You are an email marketing expert who writes high-converting sales sequences.
-Create email snippets that:
-- Have attention-grabbing subject line suggestions
-- Use personalization placeholders like {first_name}
-- Include social proof naturally
-- Have clear CTAs
-- Keep the tone warm and professional
-- Be concise and scannable`,
+Provide 3 subject line options, a preheader, an email body using {first_name} placeholder and warm professional tone, and a button label.
+Schema: { "subjectLines": string[], "preheader": string, "body": string, "cta": string }${JSON_ONLY}`,
 
-    casestudy: `You are a B2B content writer who creates compelling mini case studies.
-Create case studies that:
-- Follow the Challenge → Solution → Results format
-- Include specific metrics and outcomes
-- Use direct quotes from the testimonial
-- Highlight the transformation
-- Be concise but impactful
-- Include a compelling headline`,
+    casestudy: `You are a B2B content writer creating compelling mini case studies.
+Use Challenge → Solution → Results format with a strong headline and a pull quote drawn verbatim from the testimonial. Only include metrics that are real or directly derivable from the input — never invent numbers. If a testimonial has revenue attributed, include it as a metric.
+Schema: { "headline": string, "challenge": string, "solution": string, "results": string, "metrics": { "label": string, "value": string }[], "pullQuote": string }${JSON_ONLY}`,
 
-    quote: `You are a brand copywriter who crafts shareable quote graphics.
-Create quote content that:
-- Extract the most impactful quote from the testimonial
-- Keep it short and memorable (under 20 words ideally)
-- Focus on results and emotions
-- Include attribution with name and company
-- Make it visually balanced for graphics`,
+    quote: `You are a brand copywriter crafting shareable quote graphics. Pull the single punchiest quote (under 20 words) from the testimonial.
+Schema: { "quote": string, "author": string, "company": string, "rating": number }${JSON_ONLY}`,
   };
 
   return prompts[contentType] || prompts.twitter;
+};
+
+const parseJson = (raw: string): unknown | null => {
+  let s = raw.trim();
+  // Strip code fences defensively
+  s = s.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+  // Find outermost braces
+  const first = s.indexOf('{');
+  const last = s.lastIndexOf('}');
+  if (first !== -1 && last !== -1 && last > first) s = s.slice(first, last + 1);
+  try { return JSON.parse(s); } catch { return null; }
 };
 
 const getUserPrompt = (testimonials: Testimonial[], contentType: string, contentTypeInfo: any): string => {
@@ -135,22 +123,27 @@ serve(async (req) => {
     const systemPrompt = getSystemPrompt(contentType);
     const userPrompt = getUserPrompt(testimonials, contentType, contentTypeInfo);
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        max_completion_tokens: 1000,
-        temperature: 0.7,
-      }),
-    });
+    const callModel = async () => {
+      const r = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-3-pro-preview',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          max_completion_tokens: 2000,
+          temperature: 0.7,
+        }),
+      });
+      return r;
+    };
+
+    let response = await callModel();
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -170,15 +163,29 @@ serve(async (req) => {
       throw new Error('Failed to generate content');
     }
 
-    const data = await response.json();
-    const generatedContent = data.choices?.[0]?.message?.content;
+    let data = await response.json();
+    let raw = data.choices?.[0]?.message?.content;
+    let parsed = raw ? parseJson(raw) : null;
 
-    if (!generatedContent) {
-      throw new Error('No content generated');
+    if (!parsed) {
+      // Retry once
+      const retry = await callModel();
+      if (retry.ok) {
+        const d2 = await retry.json();
+        const r2 = d2.choices?.[0]?.message?.content;
+        parsed = r2 ? parseJson(r2) : null;
+      }
+    }
+
+    if (!parsed) {
+      return new Response(
+        JSON.stringify({ error: 'generation_failed' }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     return new Response(
-      JSON.stringify({ content: generatedContent }),
+      JSON.stringify({ content: parsed, contentType }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
