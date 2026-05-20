@@ -12,11 +12,11 @@ import {
 import { cn } from "@/lib/utils";
 
 const settingsNav = [
-  { path: '/dashboard/settings', label: 'General', icon: Settings, emoji: '⚙️' },
-  { path: '/dashboard/settings/team', label: 'Team', icon: Users, emoji: '👥' },
-  { path: '/dashboard/settings/integrations', label: 'Integrations', icon: Plug, emoji: '🔌' },
-  { path: '/dashboard/settings/billing', label: 'Billing', icon: CreditCard, emoji: '💳' },
-  { path: '/dashboard/settings/api', label: 'API', icon: Key, emoji: '🔑' },
+  { path: '/dashboard/settings', label: 'General', icon: Settings },
+  { path: '/dashboard/settings/team', label: 'Team', icon: Users },
+  { path: '/dashboard/settings/integrations', label: 'Integrations', icon: Plug },
+  { path: '/dashboard/settings/billing', label: 'Billing', icon: CreditCard },
+  { path: '/dashboard/settings/api', label: 'API', icon: Key },
 ];
 
 interface SettingsLayoutProps {
@@ -35,41 +35,34 @@ const SettingsLayout = ({ children }: SettingsLayoutProps) => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container max-w-7xl mx-auto py-8 px-4">
+      <div className="max-w-6xl mx-auto px-6 py-10">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Link to="/dashboard">
-            <button className="p-2 rounded-lg hover:bg-secondary transition-colors">
-              <ArrowLeft className="w-5 h-5 text-muted-foreground" />
-            </button>
+        <div className="flex items-center gap-3 mb-8">
+          <Link to="/dashboard" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+            ← Dashboard
           </Link>
-          <div>
-            <h1 className="text-3xl font-display font-bold text-foreground">Settings</h1>
-            <p className="text-muted-foreground">Manage your account and preferences</p>
-          </div>
+          <span className="text-xs text-muted-foreground/50">/</span>
+          <h1 className="text-[22px] font-semibold text-foreground tracking-tight">Settings</h1>
         </div>
+        <p className="text-sm text-muted-foreground mb-8 -mt-6 ml-[5.5rem]">Manage your account and preferences</p>
 
         <div className="flex flex-col md:flex-row gap-8">
           {/* Sidebar */}
-          <aside className="w-full md:w-64 flex-shrink-0">
-            <nav className="space-y-1">
+          <aside className="w-full md:w-56 flex-shrink-0">
+            <nav className="space-y-0.5">
               {settingsNav.map((item) => (
                 <Link
                   key={item.path}
                   to={item.path}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-lg transition-all group",
+                    "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors duration-150",
                     isActive(item.path)
-                      ? "bg-primary/10 text-primary border border-primary/20"
-                      : "hover:bg-secondary text-foreground"
+                      ? "bg-primary-light text-primary font-medium"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                   )}
                 >
-                  <span className="text-lg">{item.emoji}</span>
-                  <span className="flex-1 font-medium">{item.label}</span>
-                  <ChevronRight className={cn(
-                    "w-4 h-4 transition-transform",
-                    isActive(item.path) ? "text-primary" : "text-muted-foreground group-hover:translate-x-1"
-                  )} />
+                  <item.icon className="w-4 h-4" />
+                  <span className="flex-1">{item.label}</span>
                 </Link>
               ))}
             </nav>
