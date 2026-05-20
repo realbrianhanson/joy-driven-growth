@@ -330,7 +330,7 @@ export default function PublicForm() {
             <div className="flex justify-between pt-6">
               <Button variant="ghost" onClick={goBack}><ArrowLeft className="w-4 h-4 mr-2" />Back</Button>
               <Button
-                onClick={customQuestions.length > 0 ? goNext : handleSubmit}
+                onClick={(customQuestions.length > 0 || needsConsentStep) ? goNext : handleSubmit}
                 disabled={
                   isSubmitting ||
                   (testimonialType === "text" && !content.trim()) ||
@@ -338,7 +338,7 @@ export default function PublicForm() {
                 }
                 style={{ backgroundColor: brandColor }}
               >
-                {customQuestions.length > 0 ? <>Next <ArrowRight className="w-4 h-4 ml-2" /></> : <>Submit</>}
+                {(customQuestions.length > 0 || needsConsentStep) ? <>Next <ArrowRight className="w-4 h-4 ml-2" /></> : <>Submit</>}
               </Button>
             </div>
           </StepShell>
@@ -353,6 +353,9 @@ export default function PublicForm() {
                   <label className="text-sm font-medium text-foreground">
                     {q.question}{q.required && <span className="text-destructive ml-1">*</span>}
                   </label>
+                  {q.helpText && (
+                    <p className="text-xs text-muted-foreground mt-1">{q.helpText}</p>
+                  )}
                   {q.type === "long_text" ? (
                     <Textarea
                       value={customAnswers[q.id] ?? ""}
@@ -374,7 +377,63 @@ export default function PublicForm() {
             </div>
             <div className="flex justify-between pt-6">
               <Button variant="ghost" onClick={goBack}><ArrowLeft className="w-4 h-4 mr-2" />Back</Button>
-              <Button onClick={handleSubmit} disabled={isSubmitting} style={{ backgroundColor: brandColor }}>
+              <Button
+                onClick={needsConsentStep ? goNext : handleSubmit}
+                disabled={isSubmitting}
+                style={{ backgroundColor: brandColor }}
+              >
+                {needsConsentStep ? <>Next <ArrowRight className="w-4 h-4 ml-2" /></> : (isSubmitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting...</> : "Submit")}
+              </Button>
+            </div>
+          </StepShell>
+        )}
+
+        {step === "consent" && (
+          <StepShell index={stepIndex.current} total={stepIndex.total} brandColor={brandColor}>
+            <h3 className="text-lg font-semibold text-foreground mb-1">One last thing</h3>
+            <p className="text-sm text-muted-foreground mb-4">Please confirm before we save your testimonial.</p>
+
+            {consentSettings.nameDisplayEnabled && (
+              <div className="mb-5">
+                <label className="text-sm font-medium text-foreground">How would you like to be shown?</label>
+                <div className="mt-2 space-y-2">
+                  {DISPLAY_PREFERENCE_OPTIONS.map((opt) => (
+                    <label key={opt.value} className="flex items-start gap-2 p-3 rounded-lg border border-border cursor-pointer hover:border-primary/40">
+                      <input
+                        type="radio"
+                        name="display_preference"
+                        value={opt.value}
+                        checked={displayPreference === opt.value}
+                        onChange={() => setDisplayPreference(opt.value)}
+                        className="mt-1"
+                      />
+                      <span className="text-sm text-foreground">{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {consentSettings.consentEnabled && (
+              <label className="flex items-start gap-3 p-4 rounded-lg border border-border cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={consentChecked}
+                  onChange={(e) => setConsentChecked(e.target.checked)}
+                  className="mt-1"
+                  required
+                />
+                <span className="text-sm text-foreground leading-relaxed">{renderedConsentText}</span>
+              </label>
+            )}
+
+            <div className="flex justify-between pt-6">
+              <Button variant="ghost" onClick={goBack}><ArrowLeft className="w-4 h-4 mr-2" />Back</Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitting || (consentSettings.consentEnabled && !consentChecked)}
+                style={{ backgroundColor: brandColor }}
+              >
                 {isSubmitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting...</> : "Submit"}
               </Button>
             </div>
