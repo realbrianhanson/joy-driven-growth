@@ -25,13 +25,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { PUBLIC_APP_URL } from "@/lib/config";
 
-const widgetTypeConfig: Record<string, { icon: string; name: string }> = {
-  carousel: { icon: '🎠', name: 'Carousel' },
-  grid: { icon: '📱', name: 'Grid' },
-  single: { icon: '⭐', name: 'Single' },
-  fomo: { icon: '🔔', name: 'FOMO Popup' },
-  popup: { icon: '💬', name: 'Popup' },
-  inline: { icon: '🏷️', name: 'Inline' },
+import { LayoutGrid, Grid3X3, Bell, MessageSquare, Award } from "lucide-react";
+
+const widgetTypeConfig: Record<string, { Icon: any; name: string }> = {
+  carousel: { Icon: LayoutGrid, name: 'Carousel' },
+  grid: { Icon: Grid3X3, name: 'Grid' },
+  single: { Icon: Star, name: 'Single' },
+  fomo: { Icon: Bell, name: 'FOMO Popup' },
+  popup: { Icon: MessageSquare, name: 'Popup' },
+  inline: { Icon: Award, name: 'Inline' },
 };
 
 const WidgetBuilder = () => {
@@ -158,29 +160,33 @@ const WidgetBuilder = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b border-border bg-card">
-        <div className="container max-w-7xl mx-auto py-4 px-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link to="/dashboard/widgets">
-                <Button variant="ghost" size="sm"><ArrowLeft className="w-4 h-4 mr-2" />Back</Button>
-              </Link>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">{widgetTypeConfig[widgetType]?.icon}</span>
-                <Input
-                  value={widgetName}
-                  onChange={(e) => setWidgetName(e.target.value)}
-                  placeholder="Widget name..."
-                  className="border-none text-lg font-semibold bg-transparent focus:ring-0 w-64"
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button className="gradient-sunny text-white" onClick={handleSave} disabled={isSaving}>
-                {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                {isNew ? 'Create Widget' : 'Save Widget'}
+      <div className="border-b border-border bg-card sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <Link to="/dashboard/widgets">
+              <Button variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground hover:text-foreground">
+                <ArrowLeft className="w-4 h-4 mr-1" /> Widgets
               </Button>
+            </Link>
+            <span className="text-border" aria-hidden>/</span>
+            <div className="flex items-center gap-2">
+              {(() => {
+                const Icon = widgetTypeConfig[widgetType]?.Icon;
+                return Icon ? <Icon className="w-4 h-4 text-muted-foreground" /> : null;
+              })()}
+              <Input
+                value={widgetName}
+                onChange={(e) => setWidgetName(e.target.value)}
+                placeholder="Widget name..."
+                className="border-none text-[15px] font-semibold bg-transparent p-0 h-auto focus-visible:ring-0 w-64"
+              />
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" className="h-8" onClick={handleSave} disabled={isSaving}>
+              {isSaving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
+              {isNew ? 'Create' : 'Save'}
+            </Button>
           </div>
         </div>
       </div>
@@ -202,11 +208,11 @@ const WidgetBuilder = () => {
                     <button
                       key={key}
                       onClick={() => setWidgetType(key)}
-                      className={`p-3 rounded-xl border-2 transition-all text-center ${
-                        widgetType === key ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                      className={`p-3 rounded-lg border transition-colors text-center ${
+                        widgetType === key ? 'border-primary bg-primary-light' : 'border-border hover:border-border-hover'
                       }`}
                     >
-                      <div className="text-2xl mb-1">{config.icon}</div>
+                      <config.Icon className={`w-4 h-4 mx-auto mb-1.5 ${widgetType === key ? 'text-primary' : 'text-muted-foreground'}`} />
                       <div className="text-xs font-medium text-foreground">{config.name}</div>
                     </button>
                   ))}
