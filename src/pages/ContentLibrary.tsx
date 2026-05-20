@@ -21,15 +21,15 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 
-const typeConfig: Record<string, { emoji: string; label: string; icon: any }> = {
-  twitter_thread: { emoji: '🐦', label: 'Twitter Thread', icon: Twitter },
-  linkedin_post: { emoji: '💼', label: 'LinkedIn Post', icon: Linkedin },
-  instagram_carousel: { emoji: '📸', label: 'Instagram', icon: Instagram },
-  email_snippet: { emoji: '📧', label: 'Email Snippet', icon: Mail },
-  case_study: { emoji: '📄', label: 'Case Study', icon: FileText },
-  quote_graphic: { emoji: '🖼️', label: 'Quote Graphic', icon: Image },
-  video_highlight: { emoji: '✂️', label: 'Video Highlight', icon: Scissors },
-  ai_avatar: { emoji: '🤖', label: 'AI Avatar', icon: Scissors },
+const typeConfig: Record<string, { label: string; icon: any }> = {
+  twitter_thread: { label: 'Twitter Thread', icon: Twitter },
+  linkedin_post: { label: 'LinkedIn Post', icon: Linkedin },
+  instagram_carousel: { label: 'Instagram', icon: Instagram },
+  email_snippet: { label: 'Email Snippet', icon: Mail },
+  case_study: { label: 'Case Study', icon: FileText },
+  quote_graphic: { label: 'Quote Graphic', icon: Image },
+  video_highlight: { label: 'Video Highlight', icon: Scissors },
+  ai_avatar: { label: 'AI Avatar', icon: Scissors },
 };
 
 const ContentLibrary = () => {
@@ -77,58 +77,58 @@ const ContentLibrary = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container max-w-7xl mx-auto py-8 px-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <div className="max-w-6xl mx-auto px-6 py-10">
+        <div className="flex items-end justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-display font-bold text-foreground flex items-center gap-2">Content Library 📚</h1>
-            <p className="text-muted-foreground mt-1">All your generated content in one place</p>
+            <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Content Library</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              <span className="tabular-nums">{content.length}</span> generated assets
+            </p>
           </div>
           <Link to="/dashboard/content">
-            <Button className="gradient-sunny text-white shadow-warm hover:shadow-warm-lg transition-all">
-              <Plus className="w-4 h-4 mr-2" />Create New
-            </Button>
+            <Button size="sm"><Plus className="w-4 h-4 mr-1.5" />Create New</Button>
           </Link>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="flex flex-col md:flex-row gap-3 mb-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="Search content..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 bg-card" />
+            <Input placeholder="Search content..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-9 bg-card" />
           </div>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[160px] bg-card"><Filter className="w-4 h-4 mr-2" /><SelectValue placeholder="Filter" /></SelectTrigger>
+            <SelectTrigger className="w-[170px] h-9 bg-card"><Filter className="w-3.5 h-3.5 mr-2" /><SelectValue placeholder="Filter" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="twitter_thread">🐦 Twitter</SelectItem>
-              <SelectItem value="linkedin_post">💼 LinkedIn</SelectItem>
-              <SelectItem value="email_snippet">📧 Email</SelectItem>
-              <SelectItem value="case_study">📄 Case Study</SelectItem>
-              <SelectItem value="quote_graphic">🖼️ Quote</SelectItem>
+              <SelectItem value="twitter_thread">Twitter</SelectItem>
+              <SelectItem value="linkedin_post">LinkedIn</SelectItem>
+              <SelectItem value="email_snippet">Email</SelectItem>
+              <SelectItem value="case_study">Case Study</SelectItem>
+              <SelectItem value="quote_graphic">Quote Graphic</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         {isLoading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
             {[1,2,3].map(i => <Card key={i} className="bg-card"><CardContent className="p-5"><Skeleton className="h-32 w-full" /></CardContent></Card>)}
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
             {filteredContent.map((item) => {
-              const tc = typeConfig[item.type] || { emoji: '📝', label: item.type, icon: FileText };
+              const tc = typeConfig[item.type] || { label: item.type, icon: FileText };
               return (
-                <Card key={item.id} className="bg-card hover:border-primary/30 hover:shadow-warm transition-all group">
+                <Card key={item.id} className="bg-card border border-border hover:border-border-hover transition-colors rounded-xl shadow-none group">
                   <CardContent className="p-5">
                     <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center text-lg">{tc.emoji}</div>
-                        <Badge variant="secondary" className="text-xs gap-1">
-                          <tc.icon className="w-3 h-3" />{tc.label}
-                        </Badge>
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-primary-light flex items-center justify-center">
+                          <tc.icon className="w-3.5 h-3.5 text-primary" />
+                        </div>
+                        <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{tc.label}</span>
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 -mr-1 -mt-1 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity">
                             <MoreVertical className="w-4 h-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -143,16 +143,16 @@ const ContentLibrary = () => {
                       </DropdownMenu>
                     </div>
 
-                    <p className="text-sm text-muted-foreground line-clamp-4 mb-4">{item.content}</p>
+                    <p className="text-sm text-foreground/80 line-clamp-4 mb-3 leading-relaxed">{item.content}</p>
 
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{item.testimonial_ids?.length || 0} testimonials</span>
-                      <span>{new Date(item.created_at).toLocaleDateString()}</span>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border">
+                      <span className="tabular-nums">{item.testimonial_ids?.length || 0} testimonials</span>
+                      <span className="tabular-nums">{new Date(item.created_at).toLocaleDateString()}</span>
                     </div>
 
-                    <div className="flex gap-2 mt-4 pt-4 border-t border-border opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="outline" size="sm" className="flex-1" onClick={() => copyContent(item.content || '')}>
-                        <Copy className="w-3 h-3 mr-1" />Copy
+                    <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="outline" size="sm" className="flex-1 h-8" onClick={() => copyContent(item.content || '')}>
+                        <Copy className="w-3 h-3 mr-1.5" />Copy
                       </Button>
                     </div>
                   </CardContent>
@@ -163,12 +163,14 @@ const ContentLibrary = () => {
         )}
 
         {!isLoading && filteredContent.length === 0 && (
-          <div className="text-center py-16">
-            <div className="text-6xl mb-4">📚</div>
-            <h3 className="text-xl font-semibold text-foreground mb-2">No content yet</h3>
-            <p className="text-muted-foreground mb-6">Create your first piece of content from testimonials</p>
+          <div className="text-center py-24 border border-dashed border-border rounded-xl">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-light mb-4">
+              <FileText className="w-5 h-5 text-primary" />
+            </div>
+            <h3 className="text-base font-semibold text-foreground mb-1.5">No content yet</h3>
+            <p className="text-sm text-muted-foreground mb-5">Create your first piece of content from testimonials.</p>
             <Link to="/dashboard/content">
-              <Button className="gradient-sunny text-white"><Plus className="w-4 h-4 mr-2" />Create Content</Button>
+              <Button size="sm"><Plus className="w-4 h-4 mr-1.5" />Create Content</Button>
             </Link>
           </div>
         )}
