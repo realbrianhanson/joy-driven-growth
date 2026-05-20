@@ -568,6 +568,41 @@ export default function FormBuilder() {
               )}
             </CardContent>
           </Card>
+
+          {/* Permission & Consent */}
+          <Card className="rounded-xl">
+            <CardContent className="p-5 space-y-4">
+              <h3 className="font-semibold text-foreground">Permission & Consent</h3>
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Ask for marketing permission</Label>
+                <Switch
+                  checked={settings.consentEnabled}
+                  onCheckedChange={(checked) => setSettings({ ...settings, consentEnabled: checked })}
+                />
+              </div>
+              {settings.consentEnabled && (
+                <div>
+                  <Label className="text-sm">Consent text</Label>
+                  <Textarea
+                    value={settings.consentText}
+                    onChange={(e) => setSettings({ ...settings, consentText: e.target.value })}
+                    rows={5}
+                    className="mt-1 text-xs"
+                  />
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Ask how they want their name shown</Label>
+                <Switch
+                  checked={settings.nameDisplayEnabled}
+                  onCheckedChange={(checked) => setSettings({ ...settings, nameDisplayEnabled: checked })}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Shown as a required checkbox on the form before submission. <code>{"{company}"}</code> is replaced with your company name.
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Center Column - Preview */}
