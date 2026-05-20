@@ -70,7 +70,7 @@ const AnimatedNumber = ({ value, suffix = "", prefix = "" }: { value: number; su
 
 /* ─── Nav ─── */
 const Nav = ({ isLoggedIn }: { isLoggedIn: boolean }) => (
-  <nav className="sticky top-0 z-50 bg-card/70 backdrop-blur-xl border-b border-border/50">
+  <nav className="sticky top-0 z-50 bg-background/75 backdrop-blur-xl border-b border-border/60">
     <div className="max-w-6xl mx-auto flex items-center justify-between h-16 px-6">
       <Link to="/" className="text-xl font-bold tracking-tight text-foreground">
         Happy<span className="text-primary">Client</span>
@@ -246,7 +246,7 @@ const Hero = ({ isLoggedIn }: { isLoggedIn: boolean }) => (
 const logos = ["Acme Corp", "Bloom Agency", "Vertex SaaS", "Nova Digital", "Meridian", "Clearpath"];
 
 const LogoCloud = () => (
-  <section className="py-14 px-6">
+  <section className="py-14 px-6 border-y border-border/60 bg-card/40">
     <motion.div
       variants={fadeIn}
       initial="hidden"
@@ -255,9 +255,9 @@ const LogoCloud = () => (
       className="max-w-5xl mx-auto flex flex-col items-center gap-6"
     >
       <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground/60">Trusted by teams at</span>
-      <div className="flex flex-wrap justify-center gap-x-12 gap-y-4">
+      <div className="flex flex-wrap justify-center items-center gap-x-12 gap-y-4">
         {logos.map((name) => (
-          <span key={name} className="text-lg font-semibold text-muted-foreground/30 select-none tracking-tight">
+          <span key={name} className="text-base md:text-lg font-semibold text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors select-none tracking-tight">
             {name}
           </span>
         ))}
@@ -292,8 +292,12 @@ const HowItWorks = () => (
   <section id="how-it-works" className="py-28 md:py-36 px-6">
     <div className="max-w-5xl mx-auto">
       <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center mb-20">
-        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4 block">How it works</span>
-        <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground">Three steps. Zero friction.</h2>
+        <div className="inline-flex items-center gap-2 mb-5">
+          <span className="h-px w-6 bg-primary/40" />
+          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">How it works</span>
+          <span className="h-px w-6 bg-primary/40" />
+        </div>
+        <h2 className="font-display text-3xl md:text-5xl font-bold tracking-[-0.02em] text-foreground">Three steps. Zero friction.</h2>
         <p className="mt-4 text-muted-foreground text-lg max-w-xl mx-auto">Go from zero testimonials to a revenue-driving social proof engine in under 10 minutes.</p>
       </motion.div>
       <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid md:grid-cols-3 gap-8">
@@ -301,10 +305,10 @@ const HowItWorks = () => (
           <motion.div
             key={s.title}
             variants={fadeUp}
-            className="relative rounded-2xl border border-border bg-card p-8 shadow-subtle hover:shadow-md transition-shadow duration-300"
+            className="relative rounded-2xl border border-border/70 bg-card p-8 shadow-[0_1px_2px_hsl(var(--foreground)/0.04)] hover:shadow-[0_20px_50px_-20px_hsl(var(--primary)/0.18)] hover:-translate-y-0.5 hover:border-primary/30 transition-all duration-300"
           >
-            <div className="absolute -top-4 left-8 flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-bold">
-              {i + 1}
+            <div className="absolute -top-4 left-8 flex items-center justify-center w-8 h-8 rounded-lg bg-foreground text-background text-xs font-bold tabular-nums shadow-md">
+              0{i + 1}
             </div>
             <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary/8 mb-6 mt-2">
               <s.icon className="w-6 h-6 text-primary" />
@@ -364,20 +368,24 @@ const features = [
 ];
 
 const FeatureShowcase = () => (
-  <section id="features" className="py-28 md:py-36 px-6 bg-card/50">
+  <section id="features" className="py-28 md:py-36 px-6 bg-card/40 border-y border-border/60">
     <div className="max-w-6xl mx-auto">
       <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center mb-16">
-        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4 block">Features</span>
-        <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground">Built for teams that close deals</h2>
+        <div className="inline-flex items-center gap-2 mb-5">
+          <span className="h-px w-6 bg-primary/40" />
+          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">Features</span>
+          <span className="h-px w-6 bg-primary/40" />
+        </div>
+        <h2 className="font-display text-3xl md:text-5xl font-bold tracking-[-0.02em] text-foreground">Built for teams that close deals</h2>
         <p className="mt-4 text-muted-foreground text-lg max-w-xl mx-auto">Every feature earns its keep. No bloat, no fluff — just the tools that move pipeline.</p>
       </motion.div>
       <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {features.map((f) => (
-          <motion.div key={f.title} variants={fadeUp} className="rounded-xl border border-border bg-card p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-center w-11 h-11 rounded-lg bg-primary/10 mb-4">
-              <f.icon className="w-5 h-5 text-primary" />
+          <motion.div key={f.title} variants={fadeUp} className="group rounded-xl border border-border/70 bg-background/60 backdrop-blur-sm p-6 hover:border-primary/30 hover:shadow-[0_20px_50px_-20px_hsl(var(--primary)/0.15)] hover:-translate-y-0.5 transition-all duration-300">
+            <div className="flex items-center justify-center w-11 h-11 rounded-lg bg-primary/10 mb-5 group-hover:bg-primary/15 transition-colors">
+              <f.icon className="w-5 h-5 text-primary" strokeWidth={2} />
             </div>
-            <h3 className="font-semibold text-foreground mb-1.5">{f.title}</h3>
+            <h3 className="font-semibold text-foreground mb-1.5 tracking-tight">{f.title}</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">{f.body}</p>
           </motion.div>
         ))}
@@ -391,8 +399,12 @@ const Pricing = () => (
   <section id="pricing" className="py-28 md:py-36 px-6 bg-background">
     <div className="max-w-6xl mx-auto">
       <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center mb-12">
-        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4 block">Pricing</span>
-        <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground">Simple, honest pricing</h2>
+        <div className="inline-flex items-center gap-2 mb-5">
+          <span className="h-px w-6 bg-primary/40" />
+          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">Pricing</span>
+          <span className="h-px w-6 bg-primary/40" />
+        </div>
+        <h2 className="font-display text-3xl md:text-5xl font-bold tracking-[-0.02em] text-foreground">Simple, honest pricing</h2>
         <p className="mt-4 text-muted-foreground text-lg">Start free. Upgrade when you need more.</p>
       </motion.div>
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -402,22 +414,22 @@ const Pricing = () => (
           { name: "Pro", price: "$79", period: "/mo", popular: true, features: ["Everything in Starter", "Revenue attribution", "Smart review routing", "AI content generator", "Advanced analytics"], cta: "Start trial" },
           { name: "Scale", price: "Custom", period: "", features: ["Everything in Pro", "Unlimited SMS", "Priority support", "Dedicated success manager"], cta: "Contact sales" },
         ].map((tier) => (
-          <div key={tier.name} className={`relative bg-card rounded-xl p-6 border ${tier.popular ? "border-primary ring-2 ring-primary/20" : "border-border"}`}>
+          <div key={tier.name} className={`relative bg-card rounded-2xl p-7 border transition-all duration-300 hover:-translate-y-0.5 ${tier.popular ? "border-primary/40 shadow-[0_24px_60px_-20px_hsl(var(--primary)/0.25)]" : "border-border/70 hover:border-primary/20 hover:shadow-[0_20px_50px_-20px_hsl(var(--primary)/0.15)]"}`}>
             {tier.popular && (
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-foreground text-background text-[10px] font-semibold uppercase tracking-[0.15em] px-3 py-1 rounded-md">
                 Most popular
               </div>
             )}
-            <div className="mb-1 text-sm font-medium text-muted-foreground">{tier.name}</div>
-            <div className="flex items-baseline gap-1 mb-4">
-              <span className="text-3xl font-bold text-foreground">{tier.price}</span>
+            <div className="mb-1 text-sm font-semibold text-foreground tracking-tight">{tier.name}</div>
+            <div className="flex items-baseline gap-1 mb-5">
+              <span className="text-4xl font-bold text-foreground tracking-[-0.03em] tabular-nums">{tier.price}</span>
               <span className="text-sm text-muted-foreground">{tier.period}</span>
             </div>
-            <ul className="space-y-2 mb-6">
+            <ul className="space-y-2.5 mb-6">
               {tier.features.map((f) => (
-                <li key={f} className="flex items-start gap-2 text-sm text-foreground">
-                  <Check className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
-                  <span>{f}</span>
+                <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" strokeWidth={2.5} />
+                  <span className="text-foreground/85">{f}</span>
                 </li>
               ))}
             </ul>
@@ -442,11 +454,23 @@ const metrics = [
 ];
 
 const Metrics = () => (
-  <section id="results" className="py-28 md:py-36 px-6">
+  <section id="results" className="relative py-28 md:py-36 px-6 overflow-hidden">
+    <div
+      className="absolute inset-0 opacity-[0.04] pointer-events-none"
+      style={{
+        backgroundImage:
+          "radial-gradient(hsl(var(--primary)) 0.5px, transparent 0.5px)",
+        backgroundSize: "24px 24px",
+      }}
+    />
     <div className="max-w-5xl mx-auto text-center">
       <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
-        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4 block">Results</span>
-        <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground">Numbers that speak louder</h2>
+        <div className="inline-flex items-center gap-2 mb-5">
+          <span className="h-px w-6 bg-primary/40" />
+          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">Results</span>
+          <span className="h-px w-6 bg-primary/40" />
+        </div>
+        <h2 className="font-display text-3xl md:text-5xl font-bold tracking-[-0.02em] text-foreground">Numbers that speak louder</h2>
         <p className="mt-4 text-muted-foreground text-lg max-w-xl mx-auto">Happy Client users see measurable results within their first 30 days.</p>
       </motion.div>
       <motion.div
@@ -460,12 +484,12 @@ const Metrics = () => (
           <motion.div
             key={m.label}
             variants={fadeUp}
-            className="rounded-2xl border border-border bg-card p-10 shadow-subtle"
+            className="rounded-2xl border border-border/70 bg-card p-10 shadow-[0_1px_2px_hsl(var(--foreground)/0.04)] hover:shadow-[0_24px_60px_-20px_hsl(var(--primary)/0.18)] hover:-translate-y-0.5 transition-all duration-300"
           >
-            <span className="text-5xl md:text-6xl font-bold text-primary tracking-tight">
+            <span className="text-5xl md:text-6xl font-bold text-foreground tracking-[-0.03em] tabular-nums">
               <AnimatedNumber value={m.value} suffix={m.suffix} prefix={m.prefix || ""} />
             </span>
-            <p className="mt-3 text-foreground font-semibold text-lg">{m.label}</p>
+            <p className="mt-3 text-foreground font-semibold text-lg tracking-tight">{m.label}</p>
             <p className="mt-1 text-sm text-muted-foreground">{m.sublabel}</p>
           </motion.div>
         ))}
@@ -476,7 +500,7 @@ const Metrics = () => (
 
 /* ─── Testimonial ─── */
 const TestimonialQuote = () => (
-  <section className="py-28 md:py-36 px-6 bg-card/50">
+  <section className="py-28 md:py-36 px-6 bg-card/40 border-y border-border/60">
     <motion.div
       variants={fadeUp}
       initial="hidden"
@@ -484,20 +508,16 @@ const TestimonialQuote = () => (
       viewport={{ once: true }}
       className="max-w-3xl mx-auto text-center"
     >
-      <div className="flex justify-center mb-8">
-        <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/8">
-          <Quote className="w-7 h-7 text-primary" />
-        </div>
-      </div>
-      <blockquote className="text-2xl md:text-3xl font-medium leading-snug text-foreground">
-        "We collected 47 testimonials in our first week and attributed <span className="text-primary font-bold">$120K in pipeline</span> directly to them. This tool pays for itself on day one."
+      <Quote className="w-10 h-10 text-primary/30 mx-auto mb-8" strokeWidth={1.5} />
+      <blockquote className="text-2xl md:text-[34px] font-medium leading-[1.3] tracking-[-0.01em] text-foreground">
+        “We collected 47 testimonials in our first week and attributed <span className="text-primary font-semibold">$120K in pipeline</span> directly to them. This tool pays for itself on day one.”
       </blockquote>
       <div className="mt-10 flex items-center justify-center gap-4">
-        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+        <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
           <span className="text-sm font-bold text-primary">SC</span>
         </div>
         <div className="text-left">
-          <p className="font-semibold text-foreground">Sarah Chen</p>
+          <p className="font-semibold text-foreground tracking-tight">Sarah Chen</p>
           <p className="text-sm text-muted-foreground">VP of Marketing, Vertex SaaS</p>
         </div>
       </div>
@@ -532,15 +552,16 @@ const TrustBar = () => (
 
 /* ─── Final CTA ─── */
 const FinalCta = ({ isLoggedIn }: { isLoggedIn: boolean }) => (
-  <section className="py-28 md:py-36 px-6">
+  <section className="relative py-28 md:py-36 px-6 overflow-hidden">
+    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.08)_0%,transparent_60%)] pointer-events-none" />
     <motion.div
       variants={fadeUp}
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true }}
-      className="max-w-3xl mx-auto text-center"
+      className="relative max-w-3xl mx-auto text-center"
     >
-      <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground leading-tight">
+      <h2 className="font-display text-4xl md:text-6xl font-bold tracking-[-0.02em] text-foreground leading-[1.05]">
         Ready to turn your clients into your <span className="text-primary">sales team</span>?
       </h2>
       <p className="mt-6 text-lg text-muted-foreground max-w-xl mx-auto">
