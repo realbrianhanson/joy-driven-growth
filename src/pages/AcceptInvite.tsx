@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 const AcceptInvite = () => {
   const { token } = useParams<{ token: string }>();
-  const { user, loading: authLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [status, setStatus] = useState<"idle" | "accepting" | "ok" | "error">("idle");
   const [message, setMessage] = useState<string>("");
