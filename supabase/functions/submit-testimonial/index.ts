@@ -34,10 +34,14 @@ serve(async (req) => {
       );
     }
 
-    const bad = (msg: string) =>
-      new Response(JSON.stringify({ error: msg }), {
+    const bad = (msg: string) => {
+      console.warn("submit-testimonial validation failed:", msg, {
+        form_slug, type, has_content: !!content, rating, has_video: !!video_url, has_audio: !!audio_url,
+      });
+      return new Response(JSON.stringify({ error: msg }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    };
 
     if (typeof author_name !== "string") return bad("author_name must be a string");
     author_name = author_name.trim();
