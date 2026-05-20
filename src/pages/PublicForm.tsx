@@ -56,6 +56,11 @@ export default function PublicForm() {
     return Array.isArray(cq) ? cq.filter((q) => q && q.type !== ("video" as never) && q.type !== ("audio" as never)) : [];
   }, [form]);
 
+  const videoMaxLength = useMemo(() => {
+    const cq = form?.custom_questions as { settings?: { video_max_length?: number } } | null;
+    return cq?.settings?.video_max_length ?? 60;
+  }, [form]);
+
   const brandColor = form?.primary_color ?? "#F97316";
 
   const fireConfetti = () => {
@@ -279,7 +284,7 @@ export default function PublicForm() {
 
             {testimonialType === "video" && (
               <VideoRecorder
-                maxDuration={60}
+                maxDuration={videoMaxLength}
                 onRecordingComplete={(blob, url) => {
                   setMediaBlob(blob);
                   setMediaUrl(url);
@@ -289,7 +294,7 @@ export default function PublicForm() {
 
             {testimonialType === "audio" && (
               <AudioRecorder
-                maxDuration={60}
+                maxDuration={videoMaxLength}
                 onRecordingComplete={(blob, url) => {
                   setMediaBlob(blob);
                   setMediaUrl(url);
