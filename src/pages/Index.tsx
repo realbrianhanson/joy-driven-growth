@@ -106,8 +106,16 @@ const Nav = ({ isLoggedIn }: { isLoggedIn: boolean }) => (
 /* ─── Hero ─── */
 const Hero = ({ isLoggedIn }: { isLoggedIn: boolean }) => (
   <section className="relative overflow-hidden">
-    {/* Subtle background radial */}
+    {/* Subtle background radial + dot grid */}
     <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.06)_0%,transparent_60%)]" />
+    <div
+      className="absolute inset-0 opacity-[0.04] pointer-events-none"
+      style={{
+        backgroundImage:
+          "radial-gradient(hsl(var(--primary)) 0.5px, transparent 0.5px)",
+        backgroundSize: "24px 24px",
+      }}
+    />
 
     <div className="relative max-w-6xl mx-auto px-6 pt-20 md:pt-28 pb-8">
       <div className="text-center max-w-4xl mx-auto">
@@ -116,7 +124,7 @@ const Hero = ({ isLoggedIn }: { isLoggedIn: boolean }) => (
           variants={fadeUp}
           initial="hidden"
           animate="visible"
-          className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-[68px] font-bold leading-[1.05] tracking-tight text-foreground"
+          className="font-display text-5xl sm:text-6xl md:text-7xl lg:text-[76px] font-bold leading-[1.04] tracking-[-0.02em] text-foreground"
         >
           Your best clients are your{" "}
           <span className="relative">
@@ -175,26 +183,38 @@ const Hero = ({ isLoggedIn }: { isLoggedIn: boolean }) => (
           initial="hidden"
           animate="visible"
           transition={{ delay: 0.35 }}
-          className="mt-12 flex flex-wrap items-center justify-center gap-6 text-sm"
+          className="mt-16 flex flex-wrap items-center justify-center gap-y-6 gap-x-10 text-sm"
         >
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <div className="flex -space-x-2">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="w-7 h-7 rounded-full bg-primary/10 border-2 border-card flex items-center justify-center">
-                  <span className="text-[10px] font-bold text-primary">{["S", "M", "A", "J"][i]}</span>
-                </div>
-              ))}
-            </div>
-            <span className="font-medium">2,000+ teams</span>
+          <div className="flex items-center -space-x-2.5">
+            {[
+              { initials: "JD", bg: "bg-primary/10", text: "text-primary" },
+              { initials: "MK", bg: "bg-emerald-100", text: "text-emerald-700" },
+              { initials: "AS", bg: "bg-amber-100", text: "text-amber-700" },
+              { initials: "+", bg: "bg-foreground", text: "text-background" },
+            ].map((a, i) => (
+              <div
+                key={i}
+                className={`w-9 h-9 rounded-full border-2 border-background flex items-center justify-center text-[10px] font-bold ${a.bg} ${a.text}`}
+              >
+                {a.initials}
+              </div>
+            ))}
+            <span className="pl-5 font-semibold text-foreground">2,000+ teams</span>
           </div>
           <span className="h-4 w-px bg-border hidden sm:block" />
-          <span className="inline-flex items-center gap-1.5 font-medium text-muted-foreground">
-            <DollarSign className="w-4 h-4 text-primary" />$4.2M attributed
-          </span>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+              <DollarSign className="w-4 h-4" />
+            </div>
+            <span className="font-semibold text-foreground tabular-nums">$4.2M attributed</span>
+          </div>
           <span className="h-4 w-px bg-border hidden sm:block" />
-          <span className="inline-flex items-center gap-1.5 font-medium text-muted-foreground">
-            <MessageSquareText className="w-4 h-4 text-primary" />12K+ testimonials
-          </span>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+              <MessageSquareText className="w-4 h-4" />
+            </div>
+            <span className="font-semibold text-foreground tabular-nums">12K+ testimonials</span>
+          </div>
         </motion.div>
       </div>
 
@@ -204,9 +224,11 @@ const Hero = ({ isLoggedIn }: { isLoggedIn: boolean }) => (
         initial="hidden"
         animate="visible"
         transition={{ delay: 0.4 }}
-        className="mt-16 md:mt-20 relative"
+        className="mt-20 md:mt-24 relative group"
       >
-        <div className="relative rounded-xl overflow-hidden border border-border/60 shadow-[0_20px_80px_-20px_hsl(var(--primary)/0.15),0_0_0_1px_hsl(var(--border)/0.5)]">
+        {/* Ambient glow */}
+        <div className="absolute -inset-6 bg-primary/5 rounded-[40px] blur-2xl opacity-60" />
+        <div className="relative rounded-[28px] overflow-hidden border border-border/60 bg-card shadow-[0_32px_80px_-20px_hsl(var(--primary)/0.18),0_0_0_1px_hsl(var(--border)/0.6)] transition-transform duration-700 hover:scale-[1.005]">
           <img
             src={heroDashboard}
             alt="Happy Client dashboard showing testimonial management with revenue attribution"
