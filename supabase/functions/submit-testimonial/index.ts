@@ -94,6 +94,12 @@ Deno.serve(async (req) => {
   const consent_text = consent_text_raw
   const consent_timestamp = consent_given ? new Date().toISOString() : null
 
+  const already_developed = body.already_developed === true
+  const developed_content = typeof body.developed_content === 'string' ? body.developed_content.slice(0, 8000) : null
+  const developed_pull_quote = typeof body.developed_pull_quote === 'string' ? body.developed_pull_quote.slice(0, 300) : null
+  const developed_one_liner = typeof body.developed_one_liner === 'string' ? body.developed_one_liner.slice(0, 200) : null
+  const developed_at = already_developed && developed_content ? new Date().toISOString() : null
+
   const insert = {
     user_id: ownerUserId!,
     form_id: formId,
@@ -113,6 +119,10 @@ Deno.serve(async (req) => {
     consent_text,
     consent_timestamp,
     display_preference,
+    developed_content: already_developed ? developed_content : null,
+    developed_pull_quote: already_developed ? developed_pull_quote : null,
+    developed_one_liner: already_developed ? developed_one_liner : null,
+    developed_at,
   }
 
   const { data: inserted, error: insErr } = await supabase
