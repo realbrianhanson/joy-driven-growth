@@ -10,6 +10,7 @@ import confetti from "canvas-confetti";
 import { VideoRecorder } from "@/components/testimonials/VideoRecorder";
 import { AudioRecorder } from "@/components/testimonials/AudioRecorder";
 import { useFormBySlug } from "@/hooks/use-forms";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DEFAULT_CONSENT_TEMPLATE, DISPLAY_PREFERENCE_OPTIONS, renderConsentText, type DisplayPreference } from "@/lib/consent";
 
@@ -29,6 +30,16 @@ interface CustomQuestion {
 export default function PublicForm() {
   const { slug } = useParams<{ slug: string }>();
   const { data: form, isLoading, error } = useFormBySlug(slug ?? "");
+
+  const { data: ownerCompany } = useQuery({
+    queryKey: ["form-owner-company", slug],
+    enabled: !!slug,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_form_owner_company", { p_slug: slug! });
+      if (error) return null;
+      return (data as string | null) ?? null;
+    },
+  });
 
   const [step, setStep] = useState<FormStep>("welcome");
   const [testimonialType, setTestimonialType] = useState<TestimonialType>("text");
@@ -75,8 +86,8 @@ export default function PublicForm() {
   }, [form]);
 
   const renderedConsentText = useMemo(
-    () => renderConsentText(consentSettings.consentText, authorCompany || (form as unknown as { company_name?: string } | null)?.company_name),
-    [consentSettings.consentText, authorCompany, form],
+    () => renderConsentText(consentSettings.consentText, ownerCompany),
+    [consentSettings.consentText, ownerCompany],
   );
 
   const needsConsentStep = consentSettings.consentEnabled || consentSettings.nameDisplayEnabled;
