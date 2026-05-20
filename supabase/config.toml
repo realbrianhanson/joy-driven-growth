@@ -20,3 +20,9 @@ verify_jwt = true
 
 [functions.submit-testimonial]
 verify_jwt = false
+
+[functions.create-checkout-session]
+verify_jwt = true
+
+[functions.create-customer-portal]
+verify_jwt = true
