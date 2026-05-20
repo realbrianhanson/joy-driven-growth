@@ -15,14 +15,11 @@ const planned = [
 const SettingsIntegrations = () => {
   return (
     <SettingsLayout>
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 mb-6 flex items-start gap-3">
-        <span className="text-2xl">🚧</span>
-        <div>
-          <h3 className="font-semibold text-foreground">Integrations are coming soon</h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            We're hardening these one at a time with real OAuth flows and webhook delivery. The list below is what's on deck.
-          </p>
-        </div>
+      <div className="rounded-lg border border-dashed border-border bg-muted/30 p-5 mb-6">
+        <h3 className="text-sm font-medium text-foreground">Integrations are coming soon</h3>
+        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+          We're hardening these one at a time with real OAuth flows and webhook delivery. The list below is what's on deck.
+        </p>
       </div>
 
       <Card className="bg-card">
