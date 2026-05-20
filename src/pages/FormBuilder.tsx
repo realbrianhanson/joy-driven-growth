@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Copy, Monitor, Smartphone, Plus, GripVertical, Trash2, Sparkles, Check, Loader2 } from "lucide-react";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -100,6 +103,22 @@ export default function FormBuilder() {
   const { id } = useParams();
   const { toast } = useToast();
   const isNew = id === "new";
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setQuestions((items) => {
+        const oldIndex = items.findIndex((q) => q.id === active.id);
+        const newIndex = items.findIndex((q) => q.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
 
   const { data: existingForm, isLoading: formLoading } = useFormData(isNew ? "" : (id ?? ""));
   const createMutation = useCreateForm();
@@ -474,29 +493,24 @@ export default function FormBuilder() {
             <CardContent className="p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-foreground">Questions</h3>
-                <Button variant="outline" size="sm" className="text-primary">
-                  <Sparkles className="w-4 h-4 mr-1" /> Generate with AI
-                </Button>
               </div>
 
-              <div className="space-y-2 mb-4">
-                {questions.map((q) => (
-                  <div
-                    key={q.id}
-                    onClick={() => setSelectedQuestion(q.id)}
-                    className={`p-3 rounded-lg border cursor-pointer transition-all duration-150 flex items-center gap-3 ${selectedQuestion === q.id ? "border-primary bg-primary/5" : "border-border hover:border-border-hover"}`}
-                  >
-                    <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
-                    <span className="text-sm font-medium text-muted-foreground">
-                      {questionTypes.find((t) => t.type === q.type)?.icon}
-                    </span>
-                    <span className="flex-1 text-sm truncate">{q.question}</span>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => { e.stopPropagation(); deleteQuestion(q.id); }}>
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={questions.map((q) => q.id)} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-2 mb-4">
+                    {questions.map((q) => (
+                      <SortableQuestionRow
+                        key={q.id}
+                        q={q}
+                        icon={questionTypes.find((t) => t.type === q.type)?.icon}
+                        selected={selectedQuestion === q.id}
+                        onSelect={() => setSelectedQuestion(q.id)}
+                        onDelete={() => deleteQuestion(q.id)}
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
+                </SortableContext>
+              </DndContext>
 
               <div className="grid grid-cols-4 gap-2">
                 {questionTypes.slice(0, 4).map((type) => (
