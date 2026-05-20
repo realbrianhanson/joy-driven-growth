@@ -44,6 +44,39 @@ export type Database = {
         }
         Relationships: []
       }
+      api_keys: {
+        Row: {
+          created_at: string
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          revoked_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          revoked_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          revoked_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       campaign_jobs: {
         Row: {
           attempted_at: string | null
@@ -483,6 +516,69 @@ export type Database = {
         }
         Relationships: []
       }
+      team_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          owner_user_id: string
+          role: string
+          status: string
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          owner_user_id: string
+          role?: string
+          status?: string
+          token?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          owner_user_id?: string
+          role?: string
+          status?: string
+          token?: string
+        }
+        Relationships: []
+      }
+      team_members: {
+        Row: {
+          created_at: string
+          id: string
+          member_user_id: string
+          owner_user_id: string
+          role: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          member_user_id: string
+          owner_user_id: string
+          role?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          member_user_id?: string
+          owner_user_id?: string
+          role?: string
+        }
+        Relationships: []
+      }
       testimonials: {
         Row: {
           ai_summary: string | null
@@ -733,6 +829,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_team_invite: { Args: { p_token: string }; Returns: Json }
       claim_pending_jobs: {
         Args: { p_limit?: number }
         Returns: {
