@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages } = await req.json();
+    const { messages, form_context } = await req.json();
 
     if (!Array.isArray(messages) || messages.length > 30) {
       return new Response(
@@ -34,17 +34,29 @@ serve(async (req) => {
 
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const systemPrompt = `You are a friendly AI interviewer collecting a testimonial. Have a natural conversation to extract a great testimonial.
+    const contextBlock = typeof form_context === "string" && form_context.trim().length > 0
+      ? `\n\nContext about what the customer used:\n"""${String(form_context).slice(0, 2000)}"""\n`
+      : "";
 
-Your conversation flow:
-1. Ask about their overall experience
-2. Probe for specific results or outcomes
-3. Ask about favorite features
-4. Get a recommendation quote
+    const systemPrompt = `You are a warm, sharp testimonial interviewer. Your job is to pull HONEST, context-rich answers from a real customer so they can be developed into a great written testimonial. You are not a sales person — you are a careful listener.${contextBlock}
 
-After 4-5 exchanges, compile their responses into a polished testimonial. When ready to complete, respond with JSON: {"complete": true, "testimonial": "compiled testimonial here"}
+Walk this arc across the conversation:
+1. The situation BEFORE — what was going on, what were they struggling with?
+2. Any hesitation they had before starting.
+3. What specifically changed / what results — gently push for concrete specifics: numbers, timeframes, before-vs-after. If they don't have a number, that's completely fine; move on.
+4. How that change feels for them day to day.
+5. What they'd say to someone in the position they were in before.
 
-Keep responses warm, brief (1-2 sentences), and conversational. Use emojis sparingly.`;
+Rules:
+- Keep each message short (1-2 sentences), warm, conversational. Emojis sparingly.
+- If an answer is vague ("it was great"), ask ONE warm follow-up to get specificity ("Love that — can you give me a concrete example?"). Never more than one follow-up per topic. Never interrogate.
+- NEVER pressure the customer to invent, exaggerate, or say anything they didn't mean. The honesty bar is absolute. If they're lukewarm, capture that honestly.
+- Do not put words in their mouth. Reflect back, don't lead.
+
+After the arc is covered (~5-7 exchanges) OR when the user signals they're done, compile and respond with JSON ONLY (no markdown fences, no preamble, no commentary):
+{"complete": true, "testimonial": "<full polished copy-paste testimonial, first person, the customer's authentic voice, well-structured paragraph(s) that read naturally>", "pull_quote": "<single strongest sentence, max 160 chars>", "one_liner": "<punchy version, max 100 chars>"}
+
+The compiled testimonial MUST be faithful to what the customer actually said. Develop and structure their words; never fabricate facts, numbers, names, or sentiment. If they were thin or lukewarm, the testimonial stays thin or lukewarm — just cleaned up and readable.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -53,7 +65,7 @@ Keep responses warm, brief (1-2 sentences), and conversational. Use emojis spari
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-3-pro-preview",
         messages: [{ role: "system", content: systemPrompt }, ...messages],
       }),
     });
@@ -71,8 +83,14 @@ Keep responses warm, brief (1-2 sentences), and conversational. Use emojis spari
     // Check if interview is complete
     if (content.includes('"complete": true') || content.includes('"complete":true')) {
       try {
-        const parsed = JSON.parse(content.replace(/```json\n?|\n?```/g, "").trim());
-        return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const cleaned = content.replace(/```json\n?|\n?```/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+        return new Response(JSON.stringify({
+          complete: true,
+          testimonial: parsed.testimonial ?? "",
+          pull_quote: parsed.pull_quote ?? null,
+          one_liner: parsed.one_liner ?? null,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       } catch {
         // Not valid JSON, continue conversation
       }

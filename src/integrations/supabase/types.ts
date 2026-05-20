@@ -865,6 +865,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_form_owner_company: { Args: { p_slug: string }; Returns: string }
       get_invite_by_token: {
         Args: { p_token: string }
         Returns: {

@@ -1,4 +1,4 @@
-import { Star, Copy, Play, Pause, Check, X, Edit, Download, Maximize, ChevronRight, Sparkles } from "lucide-react";
+import { Star, Copy, Play, Pause, Check, X, Edit, Download, Maximize, ChevronRight, Sparkles, Wand2, Loader2, ShieldCheck, ShieldOff } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +35,11 @@ interface TestimonialDetailProps {
     email?: string;
     location?: string;
     verified?: boolean;
+    developedContent?: string | null;
+    developedPullQuote?: string | null;
+    developedOneLiner?: string | null;
+    customFields?: Record<string, unknown> | null;
+    consentGiven?: boolean;
   };
   aiAnalysis?: AiAnalysis;
   revenueData?: RevenueAttribution;
@@ -46,6 +51,8 @@ interface TestimonialDetailProps {
   onClose?: () => void;
   isAnalyzing?: boolean;
   onRefreshAnalysis?: () => void;
+  onDevelop?: () => void;
+  isDeveloping?: boolean;
 }
 
 const sentimentConfig = {
@@ -73,6 +80,8 @@ export function TestimonialDetail({
   onClose,
   isAnalyzing,
   onRefreshAnalysis,
+  onDevelop,
+  isDeveloping,
 }: TestimonialDetailProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [copiedQuote, setCopiedQuote] = useState<string | null>(null);
@@ -285,6 +294,117 @@ export function TestimonialDetail({
               <p className="text-foreground leading-relaxed whitespace-pre-wrap">
                 {testimonial.transcript}
               </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Consent indicator */}
+        <div>
+          {testimonial.consentGiven ? (
+            <div className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Marketing permission granted
+            </div>
+          ) : (
+            <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-md border border-border">
+              <ShieldOff className="w-3.5 h-3.5" />
+              No marketing permission
+            </div>
+          )}
+        </div>
+
+        {/* Develop step: raw vs developed */}
+        {(testimonial.type === "text" || testimonial.developedContent) && (
+          <Card className="bg-card border border-border rounded-2xl">
+            <CardContent className="p-6 space-y-5">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-foreground">What they submitted</h3>
+                </div>
+                <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                  {testimonial.content || <span className="text-muted-foreground italic">No written content.</span>}
+                </p>
+                {testimonial.customFields && Object.keys(testimonial.customFields).length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {Object.entries(testimonial.customFields).map(([k, v]) => (
+                      <div key={k} className="text-sm">
+                        <div className="text-xs text-muted-foreground uppercase tracking-wide">{k}</div>
+                        <div className="text-foreground">{typeof v === "string" ? v : JSON.stringify(v)}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-border pt-5">
+                {testimonial.developedContent ? (
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-semibold text-foreground flex items-center gap-2">
+                        <Wand2 className="w-4 h-4 text-primary" />
+                        Developed testimonial
+                        <Badge variant="secondary" className="text-xs">Draft</Badge>
+                      </h3>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => copyToClipboard(testimonial.developedContent!, "developed")}>
+                          {copiedQuote === "developed" ? <Check className="w-4 h-4 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
+                          Copy
+                        </Button>
+                        {onDevelop && (
+                          <Button size="sm" variant="ghost" onClick={onDevelop} disabled={isDeveloping}>
+                            {isDeveloping ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Redevelop"}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                      {testimonial.developedContent}
+                    </p>
+                    {testimonial.developedPullQuote && (
+                      <div className="mt-4 p-3 bg-muted/40 rounded-lg border border-border">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="text-xs text-muted-foreground uppercase tracking-wide">Pull quote</div>
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => copyToClipboard(testimonial.developedPullQuote!, "pull")}>
+                            {copiedQuote === "pull" ? <Check className="w-3 h-3 text-emerald" /> : <Copy className="w-3 h-3" />}
+                          </Button>
+                        </div>
+                        <p className="text-sm text-foreground">"{testimonial.developedPullQuote}"</p>
+                      </div>
+                    )}
+                    {testimonial.developedOneLiner && (
+                      <div className="mt-2 p-3 bg-muted/40 rounded-lg border border-border">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="text-xs text-muted-foreground uppercase tracking-wide">One-liner</div>
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => copyToClipboard(testimonial.developedOneLiner!, "one")}>
+                            {copiedQuote === "one" ? <Check className="w-3 h-3 text-emerald" /> : <Copy className="w-3 h-3" />}
+                          </Button>
+                        </div>
+                        <p className="text-sm text-foreground">{testimonial.developedOneLiner}</p>
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-3">
+                      This is a draft developed from what the customer wrote. Review before publishing.
+                    </p>
+                  </>
+                ) : (
+                  onDevelop && testimonial.content ? (
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h3 className="font-semibold text-foreground flex items-center gap-2">
+                          <Wand2 className="w-4 h-4 text-primary" />
+                          Develop into testimonial
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Turn the raw answers into a polished, copy-paste-ready draft. Faithful to what they said — never invented.
+                        </p>
+                      </div>
+                      <Button onClick={onDevelop} disabled={isDeveloping}>
+                        {isDeveloping ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Developing…</> : "Develop"}
+                      </Button>
+                    </div>
+                  ) : null
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
