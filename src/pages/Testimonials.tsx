@@ -28,8 +28,7 @@ import {
   useDeleteTestimonial,
   useRejectTestimonial,
 } from "@/hooks/use-testimonials";
-import { useQuery } from "@tanstack/react-query";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { MOCK_TESTIMONIALS_LIST as MOCK_TESTIMONIALS_DATA } from "@/data/mock/testimonials";
 
