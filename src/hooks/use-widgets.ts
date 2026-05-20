@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
+import { useWorkspace } from "./use-workspace";
 import { Database } from "@/integrations/supabase/types";
 
 type Widget = Database["public"]["Tables"]["widgets"]["Row"];
@@ -8,23 +9,23 @@ type WidgetInsert = Database["public"]["Tables"]["widgets"]["Insert"];
 type WidgetUpdate = Database["public"]["Tables"]["widgets"]["Update"];
 
 export const useWidgets = () => {
-  const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
 
   return useQuery({
-    queryKey: ["widgets", user?.id],
+    queryKey: ["widgets", workspaceOwnerId],
     queryFn: async () => {
-      if (!user) return [];
+      if (!workspaceOwnerId) return [];
 
       const { data, error } = await supabase
         .from("widgets")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", workspaceOwnerId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data as Widget[];
     },
-    enabled: !!user,
+    enabled: !!workspaceOwnerId,
   });
 };
 
@@ -47,15 +48,15 @@ export const useWidget = (id: string) => {
 
 export const useCreateWidget = () => {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
 
   return useMutation({
     mutationFn: async (widget: Omit<WidgetInsert, "user_id">) => {
-      if (!user) throw new Error("Not authenticated");
+      if (!workspaceOwnerId) throw new Error("Workspace not ready");
 
       const { data, error } = await supabase
         .from("widgets")
-        .insert({ ...widget, user_id: user.id })
+        .insert({ ...widget, user_id: workspaceOwnerId })
         .select()
         .single();
 
