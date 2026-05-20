@@ -112,13 +112,13 @@ type QuestionTypeDef = typeof questionTypes[number];
 
 function SortableQuestionRow({
   q,
-  icon,
+  Icon,
   selected,
   onSelect,
   onDelete,
 }: {
   q: Question;
-  icon?: string;
+  Icon?: React.ComponentType<{ className?: string }>;
   selected: boolean;
   onSelect: () => void;
   onDelete: () => void;
@@ -146,8 +146,14 @@ function SortableQuestionRow({
       >
         <GripVertical className="w-4 h-4" />
       </button>
-      <span className="text-sm font-medium text-muted-foreground">{icon}</span>
-      <span className="flex-1 text-sm truncate">{q.question}</span>
+      {Icon && <Icon className="w-4 h-4 text-muted-foreground shrink-0" />}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm truncate">{q.question || <span className="text-muted-foreground italic">Untitled question</span>}</p>
+        {q.purpose && q.purpose !== "open" && (
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">{PURPOSE_LABELS[q.purpose]}</p>
+        )}
+      </div>
+      {q.required && <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Required</span>}
       <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => { e.stopPropagation(); onDelete(); }}>
         <Trash2 className="w-3 h-3" />
       </Button>
