@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, MessageSquare, Link2 } from "lucide-react";
+import { MessageSquare, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
@@ -371,18 +371,20 @@ export default function Testimonials() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-6 py-10">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-end justify-between mb-8">
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")} className="p-0 h-auto">
-                <ArrowLeft className="w-5 h-5 mr-1" />
-                Back
-              </Button>
-            </div>
-            <h1 className="text-3xl font-bold text-foreground">Testimonials</h1>
-            <p className="text-muted-foreground">{counts.all} testimonials</p>
+            <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Testimonials</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              <span className="tabular-nums">{counts.all}</span> total
+              {counts.pending > 0 && (
+                <>
+                  <span className="mx-1.5 text-border">·</span>
+                  <span className="tabular-nums">{counts.pending}</span> awaiting review
+                </>
+              )}
+            </p>
           </div>
         </div>
 
