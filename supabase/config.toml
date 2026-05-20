@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.twilio-status-webhook]
 verify_jwt = false
+
+[functions.send-team-invite]
+verify_jwt = true

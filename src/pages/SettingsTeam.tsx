@@ -50,15 +50,29 @@ const SettingsTeam = () => {
   const createInvite = useMutation({
     mutationFn: async () => {
       if (!email.trim()) throw new Error("Email required");
-      const { error } = await supabase.from("team_invites").insert({
-        owner_user_id: user!.id,
-        email: email.trim().toLowerCase(),
-        role,
-      });
+      const { data: newInvite, error } = await supabase
+        .from("team_invites")
+        .insert({
+          owner_user_id: user!.id,
+          email: email.trim().toLowerCase(),
+          role,
+        })
+        .select()
+        .single();
       if (error) throw error;
+      const { data: sendResult } = await supabase.functions.invoke("send-team-invite", {
+        body: { invite_id: newInvite.id },
+      });
+      return { email: newInvite.email, emailed: !!(sendResult as any)?.emailed };
     },
-    onSuccess: () => {
-      toast.success("Invite created");
+    onSuccess: (result) => {
+      if (result?.emailed) {
+        toast.success(`Invite sent to ${result.email}.`);
+      } else {
+        toast.success("Invite created", {
+          description: "Invite created — copy the link to share it.",
+        });
+      }
       setEmail("");
       qc.invalidateQueries({ queryKey: ["team-invites"] });
     },
