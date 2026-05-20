@@ -23,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { PUBLIC_APP_URL } from "@/lib/config";
 
 const widgetTypeConfig: Record<string, { icon: string; name: string }> = {
   carousel: { icon: '🎠', name: 'Carousel' },
@@ -106,7 +107,7 @@ const WidgetBuilder = () => {
 
   const embedCode = useMemo(() => {
     const widgetId = isNew ? 'YOUR_WIDGET_ID' : id;
-    return `<script src="${window.location.origin}/widget.js" data-widget-id="${widgetId}"></script>`;
+    return `<script src="${PUBLIC_APP_URL}/widget.js" data-widget-id="${widgetId}"></script>`;
   }, [id, isNew]);
 
   const copyEmbedCode = () => {
