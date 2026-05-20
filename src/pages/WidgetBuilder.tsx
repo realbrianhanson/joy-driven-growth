@@ -25,7 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { PUBLIC_APP_URL } from "@/lib/config";
 
-import { LayoutGrid, Grid3X3, Star, Bell, MessageSquare, Award } from "lucide-react";
+import { LayoutGrid, Grid3X3, Bell, MessageSquare, Award } from "lucide-react";
 
 const widgetTypeConfig: Record<string, { Icon: any; name: string }> = {
   carousel: { Icon: LayoutGrid, name: 'Carousel' },
