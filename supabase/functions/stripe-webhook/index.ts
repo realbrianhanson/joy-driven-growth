@@ -13,6 +13,16 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
+function planFromPriceId(priceId: string | null | undefined): "free" | "starter" | "pro" | "scale" {
+  const map: Record<string, "starter" | "pro"> = {};
+  const starter = Deno.env.get("STRIPE_PRICE_STARTER");
+  const pro = Deno.env.get("STRIPE_PRICE_PRO");
+  if (starter) map[starter] = "starter";
+  if (pro) map[pro] = "pro";
+  if (!priceId) return "free";
+  return map[priceId] ?? "free";
+}
+
 async function verifyStripeSignature(
   payload: string,
   signature: string,
@@ -168,7 +178,53 @@ serve(async (req) => {
       case "customer.subscription.created":
       case "customer.subscription.updated": {
         const subscription = event.data.object;
-        console.log("Subscription event:", subscription.id, subscription.status);
+        const customerId = subscription.customer;
+        const userId = subscription.metadata?.user_id;
+        const priceId = subscription.items?.data?.[0]?.price?.id ?? null;
+
+        let resolvedUserId = userId;
+        if (!resolvedUserId) {
+          const { data: row } = await supabase
+            .from("subscriptions")
+            .select("user_id")
+            .eq("stripe_customer_id", customerId)
+            .maybeSingle();
+          resolvedUserId = row?.user_id;
+        }
+        if (!resolvedUserId) {
+          console.warn("subscription event without resolvable user_id", subscription.id);
+          break;
+        }
+
+        await supabase.from("subscriptions").upsert({
+          user_id: resolvedUserId,
+          stripe_customer_id: customerId,
+          stripe_subscription_id: subscription.id,
+          status: subscription.status,
+          plan: planFromPriceId(priceId),
+          price_id: priceId,
+          current_period_start: subscription.current_period_start
+            ? new Date(subscription.current_period_start * 1000).toISOString()
+            : null,
+          current_period_end: subscription.current_period_end
+            ? new Date(subscription.current_period_end * 1000).toISOString()
+            : null,
+          cancel_at_period_end: !!subscription.cancel_at_period_end,
+          trial_end: subscription.trial_end
+            ? new Date(subscription.trial_end * 1000).toISOString()
+            : null,
+        }, { onConflict: "user_id" });
+
+        console.log(`Subscription ${event.type}: user=${resolvedUserId} status=${subscription.status} plan=${planFromPriceId(priceId)}`);
+        break;
+      }
+
+      case "customer.subscription.deleted": {
+        const subscription = event.data.object;
+        await supabase
+          .from("subscriptions")
+          .update({ status: "canceled", plan: "free", cancel_at_period_end: false })
+          .eq("stripe_subscription_id", subscription.id);
         break;
       }
 

@@ -1,158 +1,204 @@
-import { useMemo } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { 
-  CreditCard, Check, Zap, Rocket, ExternalLink
-} from "lucide-react";
+import { ExternalLink, Check, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Skeleton } from "@/components/ui/skeleton";
-import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useSubscription } from "@/hooks/use-subscription";
 import SettingsLayout from "@/components/settings/SettingsLayout";
+import { supabase } from "@/integrations/supabase/client";
+import { PLANS } from "@/lib/billing-plans";
 
 const SettingsBilling = () => {
+  const { toast } = useToast();
   const { user } = useAuth();
+  const subscription = useSubscription();
+  const [stripeNotConfigured, setStripeNotConfigured] = useState(false);
+  const [checkingOut, setCheckingOut] = useState<string | null>(null);
+  const [openingPortal, setOpeningPortal] = useState(false);
 
-  const { data: testimonialCount = 0, isLoading: loadingT } = useQuery({
-    queryKey: ['billing-testimonials', user?.id],
-    queryFn: async () => {
-      if (!user) return 0;
-      const { count, error } = await supabase
-        .from('testimonials')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-      if (error) throw error;
-      return count || 0;
-    },
+  const { data: usage, isLoading: usageLoading } = useQuery({
+    queryKey: ["billing-usage", user?.id],
     enabled: !!user,
+    queryFn: async () => {
+      const [t, w] = await Promise.all([
+        supabase.from("testimonials").select("id", { count: "exact", head: true }).eq("user_id", user!.id),
+        supabase.from("widgets").select("id", { count: "exact", head: true }).eq("user_id", user!.id),
+      ]);
+      return { testimonials: t.count ?? 0, widgets: w.count ?? 0 };
+    },
   });
 
-  const { data: smsCount = 0, isLoading: loadingS } = useQuery({
-    queryKey: ['billing-sms', user?.id],
-    queryFn: async () => {
-      if (!user) return 0;
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const { data, error } = await supabase
-        .from('campaigns')
-        .select('sent_count')
-        .eq('user_id', user.id)
-        .gte('created_at', thirtyDaysAgo.toISOString());
+  const startCheckout = async (priceId: string | null, planName: string) => {
+    if (!priceId || priceId.startsWith("price_REPLACE_ME")) {
+      toast({
+        title: "Plan not yet configured",
+        description: "Set the Stripe price ID for this plan in src/lib/billing-plans.ts to enable.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setCheckingOut(planName);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-checkout-session", {
+        body: { price_id: priceId },
+      });
       if (error) throw error;
-      return (data || []).reduce((sum, c) => sum + (c.sent_count || 0), 0);
-    },
-    enabled: !!user,
-  });
+      const payload = data as { url?: string; error?: string };
+      if (payload?.error) {
+        if (payload.error.toLowerCase().includes("not configured")) setStripeNotConfigured(true);
+        toast({ title: "Couldn't start checkout", description: payload.error, variant: "destructive" });
+        return;
+      }
+      if (payload?.url) window.location.href = payload.url;
+    } catch (err) {
+      toast({ title: "Couldn't start checkout", description: err instanceof Error ? err.message : "", variant: "destructive" });
+    } finally {
+      setCheckingOut(null);
+    }
+  };
 
-  const { data: aiCount = 0, isLoading: loadingA } = useQuery({
-    queryKey: ['billing-ai', user?.id],
-    queryFn: async () => {
-      if (!user) return 0;
-      const { count, error } = await supabase
-        .from('generated_content')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id);
+  const openPortal = async () => {
+    setOpeningPortal(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-customer-portal");
       if (error) throw error;
-      return count || 0;
-    },
-    enabled: !!user,
-  });
+      const payload = data as { url?: string; error?: string };
+      if (payload?.error) {
+        toast({ title: "Couldn't open portal", description: payload.error, variant: "destructive" });
+        return;
+      }
+      if (payload?.url) window.location.href = payload.url;
+    } catch (err) {
+      toast({ title: "Couldn't open portal", description: err instanceof Error ? err.message : "", variant: "destructive" });
+    } finally {
+      setOpeningPortal(false);
+    }
+  };
 
-  const isLoading = loadingT || loadingS || loadingA;
+  const currentPlan = PLANS[subscription.plan] ?? PLANS.free;
+  const renewal = subscription.currentPeriodEnd
+    ? new Date(subscription.currentPeriodEnd).toLocaleDateString()
+    : null;
 
   return (
     <SettingsLayout>
-      <div className="space-y-6">
-        {/* Current Plan */}
-        <Card className="bg-card border-primary/20">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-primary" />Current Plan
-                </CardTitle>
-                <CardDescription>Your subscription and usage</CardDescription>
-              </div>
-              <Badge className="gradient-sunny text-white text-lg px-4 py-1">Starter — Free</Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <div className="flex items-baseline gap-2 mb-4">
-                  <span className="text-4xl font-bold text-foreground">$0</span>
-                  <span className="text-muted-foreground">/month</span>
-                </div>
-                <ul className="space-y-2">
-                  {['25 testimonials', '2 forms', '1 widget', 'Basic analytics'].map((f, i) => (
-                    <li key={i} className="flex items-center gap-2 text-sm text-foreground">
-                      <Check className="w-4 h-4 text-emerald" />{f}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+      {stripeNotConfigured && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 mb-6 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+          <div>
+            <h3 className="font-semibold text-foreground">Billing is built but not yet connected</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              To enable real upgrades, set <code className="text-xs">STRIPE_SECRET_KEY</code>, <code className="text-xs">STRIPE_WEBHOOK_SECRET</code>, <code className="text-xs">STRIPE_PRICE_STARTER</code>, and <code className="text-xs">STRIPE_PRICE_PRO</code> in Supabase Edge Function secrets, and replace the placeholder price IDs in <code className="text-xs">src/lib/billing-plans.ts</code>. See the README for full setup.
+            </p>
+          </div>
+        </div>
+      )}
 
-              <div className="space-y-4">
-                <h3 className="font-medium text-foreground mb-1">Usage</h3>
-                <p className="text-xs text-muted-foreground mb-3">Lifetime totals. Per-period reporting coming soon.</p>
-                {isLoading ? (
-                  <div className="space-y-4">{[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
-                ) : (
-                  <>
-                    {[
-                      { label: 'Testimonials', used: testimonialCount, limit: 25 },
-                      { label: 'SMS Sent', used: smsCount, limit: 0 },
-                      { label: 'AI Generations', used: aiCount, limit: 10 },
-                    ].map((item) => (
-                      <div key={item.label}>
-                        <div className="flex items-center justify-between text-sm mb-1">
-                          <span className="text-foreground">{item.label}</span>
-                          <span className="text-muted-foreground">
-                            {item.used} / {item.limit === 0 ? '—' : item.limit}
-                          </span>
-                        </div>
-                        <Progress
-                          value={item.limit > 0 ? Math.min((item.used / item.limit) * 100, 100) : 0}
-                          className="h-2"
-                        />
-                      </div>
-                    ))}
-                  </>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader><CardTitle>Current plan</CardTitle></CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <div className="flex items-baseline gap-2 mb-2">
+                  <span className="text-2xl font-bold text-foreground">{currentPlan.name}</span>
+                  <Badge variant={subscription.isActive ? "default" : "secondary"}>{subscription.status}</Badge>
+                  {subscription.cancelAtPeriodEnd && <Badge variant="destructive">Cancels at period end</Badge>}
+                </div>
+                {renewal && (
+                  <p className="text-sm text-muted-foreground">
+                    {subscription.cancelAtPeriodEnd ? "Ends" : "Renews"} on {renewal}
+                  </p>
                 )}
               </div>
+              {subscription.hasStripeCustomer && (
+                <Button variant="outline" onClick={openPortal} disabled={openingPortal}>
+                  {openingPortal ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ExternalLink className="w-4 h-4 mr-2" />}
+                  Manage subscription
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Upgrade CTA */}
-        <Card className="bg-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Rocket className="w-5 h-5 text-primary" />Upgrade to Pro
-            </CardTitle>
-            <CardDescription>Unlock unlimited testimonials, SMS campaigns, and more</CardDescription>
-          </CardHeader>
+        <Card>
+          <CardHeader><CardTitle>Usage</CardTitle></CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between p-6 rounded-xl border-2 border-primary/20 bg-primary/5">
-              <div>
-                <div className="mb-2 text-3xl font-bold text-foreground">Get in touch</div>
-                <p className="text-sm text-muted-foreground mb-4">Pricing is being finalized — we'll send you a fair quote based on volume.</p>
-                <ul className="space-y-1">
-                  {['Unlimited testimonials', 'SMS campaigns', 'AI content studio', 'Revenue tracking'].map((f, i) => (
-                    <li key={i} className="flex items-center gap-2 text-sm text-foreground">
-                      <Check className="w-3 h-3 text-emerald" />{f}
-                    </li>
-                  ))}
-                </ul>
+            <p className="text-xs text-muted-foreground mb-4">Lifetime totals. Per-period reporting coming soon.</p>
+            {usageLoading ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : (
+              <div className="space-y-4">
+                {[
+                  { label: "Testimonials", value: usage?.testimonials ?? 0, limit: subscription.plan === "free" ? 25 : null },
+                  { label: "Widgets", value: usage?.widgets ?? 0, limit: subscription.plan === "free" ? 1 : 5 },
+                ].map((u) => (
+                  <div key={u.label}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-foreground">{u.label}</span>
+                      <span className="text-muted-foreground">{u.value}{u.limit != null && ` / ${u.limit}`}</span>
+                    </div>
+                    {u.limit != null && <Progress value={Math.min(100, (u.value / u.limit) * 100)} />}
+                  </div>
+                ))}
               </div>
-              <Button asChild className="gradient-sunny text-white shadow-warm">
-                <a href="mailto:hello@happyclient.io?subject=Upgrade%20to%20Pro">
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Get in touch
-                </a>
-              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Available plans</CardTitle></CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {(["free", "starter", "pro", "scale"] as const).map((id) => {
+                const plan = PLANS[id];
+                const isCurrent = subscription.plan === id && subscription.isActive;
+                return (
+                  <div key={id} className={`relative rounded-xl border p-5 ${plan.popular ? "border-primary ring-2 ring-primary/20" : "border-border"}`}>
+                    {plan.popular && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">
+                        Most popular
+                      </div>
+                    )}
+                    <div className="mb-1 text-sm font-medium text-muted-foreground">{plan.name}</div>
+                    <div className="flex items-baseline gap-1 mb-4">
+                      <span className="text-2xl font-bold text-foreground">{plan.price}</span>
+                      <span className="text-xs text-muted-foreground">{plan.period}</span>
+                    </div>
+                    <ul className="space-y-1.5 mb-5">
+                      {plan.features.map((f) => (
+                        <li key={f} className="flex items-start gap-1.5 text-xs text-foreground">
+                          <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
+                          <span>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {isCurrent ? (
+                      <Button variant="outline" disabled className="w-full">Current plan</Button>
+                    ) : id === "free" ? (
+                      <Button variant="outline" disabled className="w-full">Free forever</Button>
+                    ) : id === "scale" ? (
+                      <Button asChild variant="outline" className="w-full">
+                        <a href="mailto:hello@happyclient.io?subject=Scale%20plan%20inquiry">Contact sales</a>
+                      </Button>
+                    ) : (
+                      <Button
+                        className="w-full"
+                        variant={plan.popular ? "default" : "outline"}
+                        onClick={() => startCheckout(plan.priceId, plan.name)}
+                        disabled={checkingOut === plan.name}
+                      >
+                        {checkingOut === plan.name ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                        Upgrade
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

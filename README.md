@@ -71,3 +71,50 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## Enabling billing
+
+Billing is built but disconnected by default so the project remains remixable. To turn it on:
+
+### 1. Create products in Stripe
+
+Create two recurring products in your Stripe dashboard:
+- **Starter** — $29/mo
+- **Pro** — $79/mo
+
+(Scale is "contact sales" only — no Stripe product needed.)
+
+Copy the price IDs (they look like `price_1XYZabc...`).
+
+### 2. Set Supabase Edge Function secrets
+
+In your Supabase project → Project Settings → Edge Functions → Secrets, add:
+
+```
+STRIPE_SECRET_KEY=sk_live_...      # or sk_test_... for testing
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_STARTER=price_...
+STRIPE_PRICE_PRO=price_...
+```
+
+### 3. Update price IDs in code
+
+Edit `src/lib/billing-plans.ts` and replace the `STRIPE_PRICE_IDS` placeholders with your real price IDs.
+
+### 4. Configure the Stripe webhook
+
+In your Stripe dashboard → Developers → Webhooks → Add endpoint:
+
+- **Endpoint URL**: `https://<your-project>.supabase.co/functions/v1/stripe-webhook`
+- **Events to send**:
+  - `checkout.session.completed`
+  - `customer.subscription.created`
+  - `customer.subscription.updated`
+  - `customer.subscription.deleted`
+  - `payment_intent.succeeded`
+
+Copy the webhook signing secret into `STRIPE_WEBHOOK_SECRET`.
+
+### 5. Test
+
+Open the app → Settings → Billing → Upgrade. The "Billing not yet connected" banner should disappear once all four secrets are set. Use Stripe test cards (`4242 4242 4242 4242`) until you're ready to flip to live keys.
