@@ -177,23 +177,27 @@ const WallBuilder = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b border-border bg-card">
-        <div className="container max-w-7xl mx-auto py-4 px-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link to="/dashboard/walls"><Button variant="ghost" size="sm"><ArrowLeft className="w-4 h-4 mr-2" />Back</Button></Link>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">🧱</span>
-                <Input value={wallName} onChange={(e) => setWallName(e.target.value)} placeholder="Wall name..." className="border-none text-lg font-semibold bg-transparent focus:ring-0 w-64" />
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button variant="outline" size="sm" onClick={copyLink}><Share2 className="w-4 h-4 mr-2" />Share</Button>
-              <Button className="gradient-sunny text-white" onClick={handleSave} disabled={isSaving}>
-                {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                {isNew ? 'Create' : 'Save'}
+      <div className="border-b border-border bg-card sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <Link to="/dashboard/walls">
+              <Button variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground hover:text-foreground">
+                <ArrowLeft className="w-4 h-4 mr-1" /> Walls
               </Button>
-            </div>
+            </Link>
+            <span className="text-border" aria-hidden>/</span>
+            <Input value={wallName} onChange={(e) => setWallName(e.target.value)} placeholder="Wall name..." className="border-none text-[15px] font-semibold bg-transparent p-0 h-auto focus-visible:ring-0 w-64" />
+            <span className="inline-flex items-center gap-1.5 ml-2 text-[10px] uppercase tracking-wider font-medium text-muted-foreground">
+              <span className={`inline-block w-1.5 h-1.5 rounded-full ${isPublished ? 'bg-success' : 'bg-muted-foreground/40'}`} aria-hidden />
+              {isPublished ? 'Live' : 'Draft'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="h-8" onClick={copyLink}><Share2 className="w-3.5 h-3.5 mr-1.5" />Share</Button>
+            <Button size="sm" className="h-8" onClick={handleSave} disabled={isSaving}>
+              {isSaving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
+              {isNew ? 'Create' : 'Save'}
+            </Button>
           </div>
         </div>
       </div>
