@@ -118,3 +118,38 @@ Copy the webhook signing secret into `STRIPE_WEBHOOK_SECRET`.
 ### 5. Test
 
 Open the app → Settings → Billing → Upgrade. The "Billing not yet connected" banner should disappear once all four secrets are set. Use Stripe test cards (`4242 4242 4242 4242`) until you're ready to flip to live keys.
+
+## Enabling SMS campaigns
+
+SMS sends run server-side via a queue worker + Twilio status webhooks. To enable:
+
+### 1. Set Supabase Edge Function secrets
+
+```
+TWILIO_ACCOUNT_SID=AC...
+TWILIO_AUTH_TOKEN=...
+TWILIO_PHONE_NUMBER=+1...   # the 10DLC-registered sending number
+INTERNAL_WORKER_KEY=<a long random string>
+```
+
+### 2. Wire pg_cron to the worker endpoint
+
+After the migration runs, open the Supabase SQL editor and run:
+
+```sql
+ALTER DATABASE postgres SET app.worker_url = 'https://<your-project>.supabase.co/functions/v1/process-campaign-jobs';
+ALTER DATABASE postgres SET app.worker_key = '<the same INTERNAL_WORKER_KEY value>';
+```
+
+This makes the pg_cron job (which runs every minute) able to invoke the worker with the right URL and shared secret.
+
+### 3. Configure Twilio's status callback
+
+The worker passes `StatusCallback=https://<your-project>.supabase.co/functions/v1/twilio-status-webhook` on every outbound SMS, so Twilio will POST delivery updates automatically. No additional Twilio dashboard config needed; just make sure your AuthToken matches `TWILIO_AUTH_TOKEN`.
+
+### 4. TCPA / 10DLC
+
+The Compliance disclosure on the campaign recipients step is informational. You are still responsible for:
+- Collecting prior express written consent before sending to any US number.
+- Including "Reply STOP to unsubscribe" in your message template (the default template does this).
+- Registering your business and use case via Twilio 10DLC, including a Brand and Campaign approval. Happy Client does not handle this for you.

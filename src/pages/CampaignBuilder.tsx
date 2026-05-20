@@ -57,13 +57,13 @@ export default function CampaignBuilder() {
   // Step 3 - Recipients
   const [recipientsText, setRecipientsText] = useState("");
 
-  // Step 4 - Schedule (scheduled delivery not yet implemented)
-  const timing = "now" as const;
+  // Step 4 - Schedule
+  const [timing, setTiming] = useState<"now" | "scheduled">("now");
+  const [scheduledDate, setScheduledDate] = useState("");
 
   // Sending state
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [sendProgress, setSendProgress] = useState({ current: 0, total: 0 });
 
   const validRecipients = parseRecipients(recipientsText);
   const selectedForm = forms?.find((f) => f.id === selectedFormId);
@@ -84,7 +84,7 @@ export default function CampaignBuilder() {
       case 1: return campaignName.trim().length > 0 && selectedFormId.length > 0;
       case 2: return message.trim().length > 0;
       case 3: return validRecipients.length > 0;
-      case 4: return true;
+      case 4: return timing === "now" || (timing === "scheduled" && scheduledDate.length > 0);
       default: return true;
     }
   };
@@ -102,7 +102,7 @@ export default function CampaignBuilder() {
         message_template: message,
         recipients: validRecipients,
         total_recipients: validRecipients.length,
-        scheduled_at: null,
+        scheduled_at: timing === "scheduled" && scheduledDate ? new Date(scheduledDate).toISOString() : null,
       })
       .select()
       .single();
@@ -126,37 +126,41 @@ export default function CampaignBuilder() {
   const handleSend = async () => {
     setIsSending(true);
     try {
-      const campaign = await saveCampaign("active");
+      const isScheduled = timing === "scheduled" && !!scheduledDate;
+      const campaignStatus: "scheduled" | "active" = isScheduled ? "scheduled" : "active";
+      const campaign = await saveCampaign(campaignStatus);
       if (!campaign) throw new Error("Failed to create campaign");
 
-      const total = validRecipients.length;
-      setSendProgress({ current: 0, total });
+      const jobs = validRecipients.map((r) => ({
+        campaign_id: campaign.id,
+        user_id: user!.id,
+        phone: r.phone,
+        first_name: r.first_name || null,
+        message: message
+          .replace(/\{first_name\}/g, r.first_name || "there")
+          .replace(/\{form_link\}/g, formLink),
+      }));
 
-      for (let i = 0; i < total; i++) {
-        const recipient = validRecipients[i];
-        const personalizedMsg = message
-          .replace(/\{first_name\}/g, recipient.first_name || "there")
-          .replace(/\{form_link\}/g, formLink);
-
-        await supabase.functions.invoke("send-sms", {
-          body: { to: recipient.phone, message: personalizedMsg, campaign_id: campaign.id },
-        });
-        setSendProgress({ current: i + 1, total });
+      if (jobs.length > 0) {
+        const { error: jobsError } = await (supabase as any).from("campaign_jobs").insert(jobs);
+        if (jobsError) throw jobsError;
       }
 
-      // Update campaign stats
-      await supabase
-        .from("campaigns")
-        .update({ sent_count: total, status: "active" as const })
-        .eq("id", campaign.id);
+      if (!isScheduled) {
+        supabase.functions.invoke("process-campaign-jobs", { body: {} }).catch((e) => {
+          console.warn("Worker kick failed (will retry via cron):", e);
+        });
+      }
 
       toast({
-        title: "Campaign sent! 🚀",
-        description: `SMS sent to ${validRecipients.length} recipients`,
+        title: isScheduled ? "Campaign scheduled" : "Campaign queued",
+        description: isScheduled
+          ? `Will send to ${jobs.length} recipients on ${new Date(scheduledDate).toLocaleString()}.`
+          : `Queued ${jobs.length} messages. Delivery typically completes within a minute.`,
       });
       navigate("/dashboard/campaigns");
     } catch (e: any) {
-      toast({ title: "Failed to send", description: e.message, variant: "destructive" });
+      toast({ title: "Failed to queue campaign", description: e.message, variant: "destructive" });
     } finally {
       setIsSending(false);
     }
@@ -215,11 +219,8 @@ export default function CampaignBuilder() {
             <Card className="w-full max-w-sm">
               <CardContent className="p-8 text-center space-y-4">
                 <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
-                <h3 className="text-lg font-semibold text-foreground">
-                  Sending {sendProgress.current}/{sendProgress.total}...
-                </h3>
-                <Progress value={(sendProgress.current / Math.max(sendProgress.total, 1)) * 100} className="h-2" />
-                <p className="text-sm text-muted-foreground">Please don't close this page</p>
+                <h3 className="text-lg font-semibold text-foreground">Queueing campaign…</h3>
+                <p className="text-sm text-muted-foreground">This only takes a moment.</p>
               </CardContent>
             </Card>
           </div>
@@ -389,27 +390,32 @@ export default function CampaignBuilder() {
                   <p className="text-muted-foreground">Choose when to deliver your campaign</p>
                 </div>
 
-                <RadioGroup value="now">
+                <RadioGroup value={timing} onValueChange={(v) => setTiming(v as "now" | "scheduled")}>
                   <div className="space-y-3">
-                    <Card className="border-primary">
+                    <Card className={`cursor-pointer ${timing === "now" ? "border-primary" : "border-border"}`}>
                       <CardContent className="p-4 flex items-center gap-4">
                         <RadioGroupItem value="now" id="now" />
                         <Label htmlFor="now" className="flex-1 cursor-pointer">
                           <div className="font-medium">Send now</div>
-                          <div className="text-sm text-muted-foreground">Campaign will be sent immediately</div>
+                          <div className="text-sm text-muted-foreground">Queues immediately; typically delivered within a minute.</div>
                         </Label>
                       </CardContent>
                     </Card>
-                    <Card className="cursor-not-allowed opacity-60 border-border">
+                    <Card className={`cursor-pointer ${timing === "scheduled" ? "border-primary" : "border-border"}`}>
                       <CardContent className="p-4 flex items-center gap-4">
-                        <RadioGroupItem value="scheduled" id="scheduled" disabled />
-                        <Label htmlFor="scheduled" className="flex-1 cursor-not-allowed">
-                          <div className="font-medium flex items-center gap-2">
-                            Schedule for later
-                            <Badge variant="secondary" className="text-xs">Coming soon</Badge>
-                          </div>
-                          <div className="text-sm text-muted-foreground">Scheduled delivery is in development.</div>
+                        <RadioGroupItem value="scheduled" id="scheduled" />
+                        <Label htmlFor="scheduled" className="flex-1 cursor-pointer">
+                          <div className="font-medium">Schedule for later</div>
+                          <div className="text-sm text-muted-foreground">Pick a specific date and time.</div>
                         </Label>
+                        {timing === "scheduled" && (
+                          <Input
+                            type="datetime-local"
+                            value={scheduledDate}
+                            onChange={(e) => setScheduledDate(e.target.value)}
+                            className="w-auto"
+                          />
+                        )}
                       </CardContent>
                     </Card>
                   </div>

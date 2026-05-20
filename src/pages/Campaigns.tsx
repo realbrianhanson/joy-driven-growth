@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, Send, TrendingUp, MessageSquare, Users, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useDemoMode } from "@/contexts/DemoModeContext";
@@ -23,6 +24,7 @@ export default function Campaigns() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isDemoMode } = useDemoMode();
+  const queryClient = useQueryClient();
 
   const { data: realCampaigns, isLoading } = useQuery({
     queryKey: ["campaigns", user?.id],
@@ -38,6 +40,19 @@ export default function Campaigns() {
     },
     enabled: !!user && !isDemoMode,
   });
+
+  useEffect(() => {
+    if (!user || isDemoMode) return;
+    const channel = supabase
+      .channel("campaigns-changes")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "campaigns", filter: `user_id=eq.${user.id}` },
+        () => queryClient.invalidateQueries({ queryKey: ["campaigns", user.id] })
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, isDemoMode, queryClient]);
 
   const loading = isDemoMode ? false : isLoading;
   const campaigns = isDemoMode ? MOCK_CAMPAIGNS : (realCampaigns ?? []);
@@ -186,12 +201,26 @@ export default function Campaigns() {
                     const responseRate = (campaign.sent_count ?? 0) > 0
                       ? Math.round(((campaign.completed_count ?? 0) / (campaign.sent_count ?? 1)) * 100)
                       : 0;
+                    const total = campaign.total_recipients ?? 0;
+                    const completed = campaign.completed_count ?? 0;
+                    const progressPct = total > 0 ? Math.min(100, (completed / total) * 100) : 0;
+                    const inFlight = campaign.status === "active" && completed < total;
+                    const scheduledFuture =
+                      campaign.status === "scheduled" && campaign.scheduled_at && new Date(campaign.scheduled_at) > new Date();
                     return (
                       <TableRow key={campaign.id} className="cursor-pointer hover:bg-muted/50">
                         <TableCell>
                           <div>
                             <div className="font-medium text-foreground">{campaign.name}</div>
                             <div className="text-sm text-muted-foreground">{formatDate(campaign.created_at)}</div>
+                            {(inFlight || progressPct > 0) && total > 0 && (
+                              <div className="mt-2 max-w-[220px]">
+                                <Progress value={progressPct} className="h-1.5" />
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {completed} / {total} delivered
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
@@ -209,7 +238,11 @@ export default function Campaigns() {
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge variant="secondary" className={getStatusBadge(campaign.status ?? "draft")}>
-                            {campaign.status ?? "draft"}
+                            {scheduledFuture
+                              ? `Scheduled ${new Date(campaign.scheduled_at!).toLocaleDateString()}`
+                              : inFlight
+                                ? "Sending"
+                                : campaign.status ?? "draft"}
                           </Badge>
                         </TableCell>
                       </TableRow>
