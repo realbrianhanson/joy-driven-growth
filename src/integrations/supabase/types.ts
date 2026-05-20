@@ -852,6 +852,7 @@ export type Database = {
           status: string
         }[]
       }
+      get_my_team_owner: { Args: never; Returns: string }
       get_user_plan: { Args: { p_user_id: string }; Returns: string }
       get_wall_public: { Args: { p_slug: string }; Returns: Json }
       get_widget_public: { Args: { p_widget_id: string }; Returns: Json }
@@ -887,6 +888,7 @@ export type Database = {
         Args: { p_amount: number; p_widget_id: string }
         Returns: undefined
       }
+      is_team_member_of: { Args: { p_owner_id: string }; Returns: boolean }
       promote_scheduled_campaigns: { Args: never; Returns: number }
       refresh_campaign_counts: {
         Args: { p_campaign_id: string }
