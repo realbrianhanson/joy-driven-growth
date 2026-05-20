@@ -29,6 +29,7 @@ import {
   useRejectTestimonial,
 } from "@/hooks/use-testimonials";
 import { useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { MOCK_TESTIMONIALS_LIST as MOCK_TESTIMONIALS_DATA } from "@/data/mock/testimonials";
 
@@ -72,6 +73,8 @@ export default function Testimonials() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [isDeveloping, setIsDeveloping] = useState(false);
+  const queryClient = useQueryClient();
 
   // Build filter for hook
   const hookFilters = useMemo(() => {
@@ -180,6 +183,36 @@ export default function Testimonials() {
       setIsDetailOpen(true);
       setAiAnalysis(null);
       navigate(`/dashboard/testimonials/${id}`, { replace: true });
+    }
+  };
+
+  // Locate the raw DB row for the selected testimonial (for developed_* + custom_fields + consent)
+  const selectedDbRow = useMemo(() => {
+    if (!selectedTestimonial) return null;
+    return (allDbTestimonials ?? []).find((t) => t.id === selectedTestimonial.id)
+      ?? (dbTestimonials ?? []).find((t) => t.id === selectedTestimonial.id)
+      ?? null;
+  }, [selectedTestimonial, allDbTestimonials, dbTestimonials]);
+
+  const handleDevelop = async () => {
+    if (!selectedTestimonial || isDemoMode) return;
+    setIsDeveloping(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("develop-testimonial", {
+        body: { testimonial_id: selectedTestimonial.id },
+      });
+      if (error) throw error;
+      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+      toast({ title: "Testimonial developed", description: "Draft ready — review before publishing." });
+      await queryClient.invalidateQueries({ queryKey: ["testimonials"] });
+    } catch (err) {
+      toast({
+        title: "Develop failed",
+        description: err instanceof Error ? err.message : undefined,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeveloping(false);
     }
   };
 
@@ -496,6 +529,11 @@ export default function Testimonials() {
                   transcript: selectedTestimonial.type !== "text" ? selectedTestimonial.content : undefined,
                   verified: true,
                   location: undefined,
+                  developedContent: (selectedDbRow as { developed_content?: string | null } | null)?.developed_content ?? null,
+                  developedPullQuote: (selectedDbRow as { developed_pull_quote?: string | null } | null)?.developed_pull_quote ?? null,
+                  developedOneLiner: (selectedDbRow as { developed_one_liner?: string | null } | null)?.developed_one_liner ?? null,
+                  customFields: (selectedDbRow as { custom_fields?: Record<string, unknown> | null } | null)?.custom_fields ?? null,
+                  consentGiven: !!(selectedDbRow as { consent_given?: boolean } | null)?.consent_given,
                 }}
                 aiAnalysis={aiAnalysis}
                 revenueData={
@@ -510,6 +548,8 @@ export default function Testimonials() {
                 }
                 isAnalyzing={isAnalyzing}
                 onRefreshAnalysis={analyzeTestimonial}
+                onDevelop={handleDevelop}
+                isDeveloping={isDeveloping}
                 onApprove={() => {
                   handleApprove(selectedTestimonial.id);
                   handleCloseDetail();
