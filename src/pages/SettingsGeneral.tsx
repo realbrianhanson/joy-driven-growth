@@ -81,7 +81,7 @@ const SettingsGeneral = () => {
     if (error) {
       toast.error("Failed to save settings");
     } else {
-      toast.success("Settings saved successfully! ✨");
+      toast.success("Settings saved");
     }
   };
 

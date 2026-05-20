@@ -36,6 +36,7 @@ const SettingsApi = lazy(() => import("./pages/SettingsApi"));
 const AgencyDashboard = lazy(() => import("./pages/AgencyDashboard"));
 const PublicWall = lazy(() => import("./pages/PublicWall"));
 const EmbedWidget = lazy(() => import("./pages/EmbedWidget"));
+const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -73,6 +74,7 @@ const AnimatedRoutes = () => {
         <Route path="/collect/:slug/ai" element={<Suspense fallback={<PageLoader />}><AiInterview /></Suspense>} />
         <Route path="/wall/:slug" element={<Suspense fallback={<PageLoader />}><PublicWall /></Suspense>} />
         <Route path="/embed/widget/:id" element={<Suspense fallback={<PageLoader />}><EmbedWidget /></Suspense>} />
+        <Route path="/accept-invite/:token" element={<Suspense fallback={<PageLoader />}><AcceptInvite /></Suspense>} />
 
         {/* Dashboard routes - protected + layout */}
         <Route path="/dashboard" element={<DashboardRoute><Dashboard /></DashboardRoute>} />
