@@ -99,14 +99,16 @@ const defaultSettings: FormSettings = {
 };
 
 const questionTypes = [
-  { type: "short_text", icon: "T", label: "Short Text" },
-  { type: "long_text", icon: "¶", label: "Long Text" },
-  { type: "rating", icon: "★", label: "Rating" },
-  { type: "video", icon: "▶", label: "Video" },
-  { type: "audio", icon: "♪", label: "Audio" },
-  { type: "multiple_choice", icon: "☐", label: "Multiple Choice" },
-  { type: "sentiment", icon: "☺", label: "Sentiment" },
-];
+  { type: "short_text", icon: Type, label: "Short Text" },
+  { type: "long_text", icon: AlignLeft, label: "Long Text" },
+  { type: "rating", icon: Star, label: "Rating" },
+  { type: "video", icon: Video, label: "Video" },
+  { type: "audio", icon: Mic, label: "Audio" },
+  { type: "multiple_choice", icon: ListChecks, label: "Multiple Choice" },
+  { type: "sentiment", icon: Smile, label: "Sentiment" },
+] as const;
+
+type QuestionTypeDef = typeof questionTypes[number];
 
 function SortableQuestionRow({
   q,
