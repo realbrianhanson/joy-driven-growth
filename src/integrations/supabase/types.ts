@@ -44,6 +44,68 @@ export type Database = {
         }
         Relationships: []
       }
+      campaign_jobs: {
+        Row: {
+          attempted_at: string | null
+          attempts: number
+          campaign_id: string
+          created_at: string
+          delivered_at: string | null
+          error_code: string | null
+          error_message: string | null
+          first_name: string | null
+          id: string
+          message: string
+          phone: string
+          status: string
+          twilio_message_sid: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempted_at?: string | null
+          attempts?: number
+          campaign_id: string
+          created_at?: string
+          delivered_at?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          first_name?: string | null
+          id?: string
+          message: string
+          phone: string
+          status?: string
+          twilio_message_sid?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempted_at?: string | null
+          attempts?: number
+          campaign_id?: string
+          created_at?: string
+          delivered_at?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          first_name?: string | null
+          id?: string
+          message?: string
+          phone?: string
+          status?: string
+          twilio_message_sid?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_jobs_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaigns: {
         Row: {
           clicked_count: number | null
@@ -671,6 +733,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_pending_jobs: {
+        Args: { p_limit?: number }
+        Returns: {
+          campaign_id: string
+          first_name: string
+          id: string
+          message: string
+          phone: string
+          user_id: string
+        }[]
+      }
       get_user_plan: { Args: { p_user_id: string }; Returns: string }
       get_wall_public: { Args: { p_slug: string }; Returns: Json }
       get_widget_public: { Args: { p_widget_id: string }; Returns: Json }
@@ -704,6 +777,11 @@ export type Database = {
       }
       increment_widget_revenue: {
         Args: { p_amount: number; p_widget_id: string }
+        Returns: undefined
+      }
+      promote_scheduled_campaigns: { Args: never; Returns: number }
+      refresh_campaign_counts: {
+        Args: { p_campaign_id: string }
         Returns: undefined
       }
     }
