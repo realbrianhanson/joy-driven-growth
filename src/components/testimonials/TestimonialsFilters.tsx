@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Filter, Grid, List, Star } from "lucide-react";
+import { Search, ArrowUpDown, LayoutGrid, List, Check, Download, Trash2 } from "lucide-react";
 
 export type FilterType = "all" | "pending" | "approved" | "featured" | "video" | "text" | "audio";
 export type ViewType = "grid" | "list";
@@ -41,14 +40,14 @@ interface TestimonialsFiltersProps {
   onBulkDelete?: () => void;
 }
 
-const filterConfig = [
-  { key: "all" as FilterType, label: "All", icon: null },
-  { key: "pending" as FilterType, label: "Pending", icon: "⏳" },
-  { key: "approved" as FilterType, label: "Approved", icon: "✅" },
-  { key: "featured" as FilterType, label: "Featured", icon: "⭐" },
-  { key: "video" as FilterType, label: "Video", icon: "🎥" },
-  { key: "text" as FilterType, label: "Text", icon: "📝" },
-  { key: "audio" as FilterType, label: "Audio", icon: "🎤" },
+const filterConfig: { key: FilterType; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "pending", label: "Pending" },
+  { key: "approved", label: "Approved" },
+  { key: "featured", label: "Featured" },
+  { key: "video", label: "Video" },
+  { key: "text", label: "Text" },
+  { key: "audio", label: "Audio" },
 ];
 
 export function TestimonialsFilters({
@@ -69,14 +68,14 @@ export function TestimonialsFilters({
   return (
     <div className="space-y-4">
       {/* Search and View Toggle */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search by name, company, content..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-10 bg-card border-border focus:border-primary"
+            className="pl-10 h-9 bg-card border-border focus:border-primary"
           />
         </div>
         
@@ -84,8 +83,8 @@ export function TestimonialsFilters({
           {/* Sort Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <Filter className="w-4 h-4" />
+              <Button variant="outline" size="sm" className="h-9 gap-2">
+                <ArrowUpDown className="w-3.5 h-3.5" />
                 Sort
               </Button>
             </DropdownMenuTrigger>
@@ -102,14 +101,13 @@ export function TestimonialsFilters({
                 checked={sortBy === "rating"}
                 onCheckedChange={() => onSortChange("rating")}
               >
-                <Star className="w-3 h-3 mr-2 fill-gold text-gold" />
                 Highest rated
               </DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem
                 checked={sortBy === "revenue"}
                 onCheckedChange={() => onSortChange("revenue")}
               >
-                💰 Most revenue
+                Most revenue
               </DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem
                 checked={sortBy === "converting"}
@@ -121,23 +119,25 @@ export function TestimonialsFilters({
           </DropdownMenu>
 
           {/* View Toggle */}
-          <div className="flex items-center bg-muted rounded-lg p-1">
-            <Button
-              variant={viewType === "grid" ? "default" : "ghost"}
-              size="sm"
-              className={`px-3 ${viewType === "grid" ? "bg-card shadow-sm" : ""}`}
+          <div className="inline-flex items-center h-9 rounded-md border border-border bg-card p-0.5">
+            <button
               onClick={() => onViewChange("grid")}
+              className={`inline-flex items-center justify-center h-8 w-8 rounded-[5px] transition-colors ${
+                viewType === "grid" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+              aria-label="Grid view"
             >
-              <Grid className="w-4 h-4" />
-            </Button>
-            <Button
-              variant={viewType === "list" ? "default" : "ghost"}
-              size="sm"
-              className={`px-3 ${viewType === "list" ? "bg-card shadow-sm" : ""}`}
+              <LayoutGrid className="w-3.5 h-3.5" />
+            </button>
+            <button
               onClick={() => onViewChange("list")}
+              className={`inline-flex items-center justify-center h-8 w-8 rounded-[5px] transition-colors ${
+                viewType === "list" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+              aria-label="List view"
             >
-              <List className="w-4 h-4" />
-            </Button>
+              <List className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </div>
@@ -148,20 +148,20 @@ export function TestimonialsFilters({
           <button
             key={filter.key}
             onClick={() => onFilterChange(filter.key)}
-            className={`relative inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors ${
+            className={`relative inline-flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors ${
               activeFilter === filter.key
-                ? "text-primary"
+                ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {filter.label}
-            <span className={`text-xs tabular-nums ${
-              activeFilter === filter.key ? "text-primary" : "text-muted-foreground"
+            <span className={`text-[11px] tabular-nums px-1.5 py-0.5 rounded ${
+              activeFilter === filter.key ? "bg-primary-light text-primary" : "bg-muted text-muted-foreground"
             }`}>
               {counts[filter.key]}
             </span>
             {activeFilter === filter.key && (
-              <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary rounded-full" />
+              <span className="absolute -bottom-px left-2 right-2 h-0.5 bg-primary rounded-full" />
             )}
           </button>
         ))}
@@ -169,19 +169,23 @@ export function TestimonialsFilters({
 
       {/* Bulk Actions */}
       {selectedCount > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-xl animate-fade-in-up">
-          <span className="text-sm font-medium text-foreground">
-            {selectedCount} selected
+        <div className="flex items-center justify-between gap-3 px-4 h-12 bg-card border border-border rounded-lg animate-fade-in-up">
+          <span className="text-sm text-foreground">
+            <span className="font-semibold tabular-nums">{selectedCount}</span>
+            <span className="text-muted-foreground"> selected</span>
           </span>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={onBulkApprove}>
-              ✅ Approve all
+          <div className="flex gap-1.5">
+            <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={onBulkApprove}>
+              <Check className="w-3.5 h-3.5" />
+              Approve
             </Button>
-            <Button size="sm" variant="outline" onClick={onBulkExport}>
-              📤 Export
+            <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={onBulkExport}>
+              <Download className="w-3.5 h-3.5" />
+              Export
             </Button>
-            <Button size="sm" variant="outline" className="text-destructive hover:bg-destructive/10" onClick={onBulkDelete}>
-              🗑️ Delete
+            <Button size="sm" variant="outline" className="h-8 gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={onBulkDelete}>
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete
             </Button>
           </div>
         </div>
