@@ -10,18 +10,19 @@ import {
   TrendingUp,
   Sparkles,
   DollarSign,
-  Repeat,
   Quote,
   Play,
   CheckCircle2,
   Zap,
   Shield,
   Globe,
+  GitBranch,
+  Bot,
+  Bell,
+  MessageSquare,
+  Check,
 } from "lucide-react";
 import heroDashboard from "@/assets/hero-dashboard.jpg";
-import featureCollect from "@/assets/feature-collect.jpg";
-import featureRevenue from "@/assets/feature-revenue.jpg";
-import featureContent from "@/assets/feature-content.jpg";
 
 /* ─── Animations ─── */
 const fadeUp = {
@@ -115,7 +116,7 @@ const Hero = ({ isLoggedIn }: { isLoggedIn: boolean }) => (
           variants={fadeUp}
           initial="hidden"
           animate="visible"
-          className="text-4xl sm:text-5xl md:text-6xl lg:text-[68px] font-bold leading-[1.05] tracking-tight text-foreground"
+          className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-[68px] font-bold leading-[1.05] tracking-tight text-foreground"
         >
           Your best clients are your{" "}
           <span className="relative">
@@ -270,7 +271,7 @@ const HowItWorks = () => (
     <div className="max-w-5xl mx-auto">
       <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center mb-20">
         <span className="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4 block">How it works</span>
-        <h2 className="text-3xl md:text-5xl font-bold text-foreground">Three steps. Zero friction.</h2>
+        <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground">Three steps. Zero friction.</h2>
         <p className="mt-4 text-muted-foreground text-lg max-w-xl mx-auto">Go from zero testimonials to a revenue-driving social proof engine in under 10 minutes.</p>
       </motion.div>
       <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid md:grid-cols-3 gap-8">
@@ -303,72 +304,110 @@ const HowItWorks = () => (
   </section>
 );
 
-/* ─── Feature Showcase ─── */
+/* ─── Problem / Solution ─── */
+const ProblemSolution = () => (
+  <section className="py-20 px-6 bg-background">
+    <div className="max-w-5xl mx-auto">
+      <h2 className="font-display text-3xl md:text-4xl font-bold text-center text-foreground mb-3">
+        The problem with testimonials
+      </h2>
+      <p className="text-center text-muted-foreground mb-12">Most teams collect them and pray.</p>
+      <div className="grid md:grid-cols-3 gap-6">
+        {[
+          { title: "You collect them but can't prove they work", body: "No revenue attribution means testimonials are a feel-good metric, not a growth lever." },
+          { title: "Customers ignore your email requests", body: "Polite reminders sit unread. SMS gets 98% open rates — but most platforms don't offer it." },
+          { title: "Negative feedback goes public", body: "Without smart routing, unhappy customers leave reviews instead of telling you privately." },
+        ].map((p, i) => (
+          <div key={i} className="bg-card border border-border rounded-xl p-6">
+            <h3 className="font-semibold text-foreground mb-2">{p.title}</h3>
+            <p className="text-sm text-muted-foreground">{p.body}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-center text-lg text-foreground mt-12 font-medium">
+        Happy Client fixes all three.
+      </p>
+    </div>
+  </section>
+);
+
+/* ─── Feature Grid (6 features) ─── */
 const features = [
-  {
-    icon: Sparkles,
-    title: "AI-Powered Interviews",
-    desc: "Our AI conducts follow-up interviews to extract deeper, more compelling stories. It asks the right questions, at the right time, so you get testimonials that actually sell.",
-    image: featureCollect,
-    bullets: ["Adaptive follow-up questions", "Sentiment-aware probing", "Auto-generated summaries"],
-  },
-  {
-    icon: DollarSign,
-    title: "Revenue Attribution",
-    desc: "Tag testimonials to deals. Know which story closed which client. Finally, social proof with a measurable ROI that your CFO will love.",
-    image: featureRevenue,
-    bullets: ["Deal-level attribution", "Pipeline influence tracking", "Automated revenue reports"],
-  },
-  {
-    icon: Repeat,
-    title: "Content Studio",
-    desc: "Turn one testimonial into social posts, case study snippets, and ad copy — automatically. One story, infinite formats.",
-    image: featureContent,
-    bullets: ["Auto-generate social posts", "Case study snippets", "Ad copy variations"],
-  },
+  { icon: DollarSign, title: "Prove your ROI", body: "See exactly how much revenue each testimonial generates." },
+  { icon: MessageSquare, title: "SMS + email collection", body: "98% open rate over text. 3× more responses than email alone." },
+  { icon: GitBranch, title: "Smart review routing", body: "Happy customers go public. Unhappy ones go to your inbox." },
+  { icon: Bot, title: "AI conducts interviews", body: "Natural conversations extract the testimonials people won't write." },
+  { icon: Bell, title: "FOMO popups", body: "Show live social proof to convert visitors on the spot." },
+  { icon: Sparkles, title: "One-click content", body: "Turn testimonials into Twitter threads, case studies, and quote graphics." },
 ];
 
 const FeatureShowcase = () => (
   <section id="features" className="py-28 md:py-36 px-6 bg-card/50">
     <div className="max-w-6xl mx-auto">
-      <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center mb-24">
+      <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center mb-16">
         <span className="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4 block">Features</span>
-        <h2 className="text-3xl md:text-5xl font-bold text-foreground">Built for teams that close deals</h2>
+        <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground">Built for teams that close deals</h2>
         <p className="mt-4 text-muted-foreground text-lg max-w-xl mx-auto">Every feature earns its keep. No bloat, no fluff — just the tools that move pipeline.</p>
       </motion.div>
-      <div className="space-y-32">
-        {features.map((f, i) => (
-          <motion.div
-            key={f.title}
-            variants={fadeUp}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-100px" }}
-            className={`flex flex-col ${i % 2 !== 0 ? "md:flex-row-reverse" : "md:flex-row"} items-center gap-12 md:gap-16`}
-          >
-            <div className="flex-1 max-w-lg">
-              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary/8 mb-6">
-                <f.icon className="w-6 h-6 text-primary" />
-              </div>
-              <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-4">{f.title}</h3>
-              <p className="text-muted-foreground text-lg leading-relaxed mb-6">{f.desc}</p>
-              <ul className="space-y-3">
-                {f.bullets.map((b) => (
-                  <li key={b} className="flex items-center gap-3 text-muted-foreground">
-                    <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
-                    <span>{b}</span>
-                  </li>
-                ))}
-              </ul>
+      <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {features.map((f) => (
+          <motion.div key={f.title} variants={fadeUp} className="rounded-xl border border-border bg-card p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-center w-11 h-11 rounded-lg bg-primary/10 mb-4">
+              <f.icon className="w-5 h-5 text-primary" />
             </div>
-            <div className="flex-1 w-full">
-              <div className="rounded-2xl overflow-hidden border border-border/60 shadow-[0_12px_40px_-12px_hsl(var(--foreground)/0.08)]">
-                <img src={f.image} alt={f.title} className="w-full object-cover" />
-              </div>
-            </div>
+            <h3 className="font-semibold text-foreground mb-1.5">{f.title}</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">{f.body}</p>
           </motion.div>
         ))}
+      </motion.div>
+    </div>
+  </section>
+);
+
+/* ─── Pricing ─── */
+const Pricing = () => (
+  <section id="pricing" className="py-28 md:py-36 px-6 bg-background">
+    <div className="max-w-6xl mx-auto">
+      <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="text-center mb-12">
+        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4 block">Pricing</span>
+        <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground">Simple, honest pricing</h2>
+        <p className="mt-4 text-muted-foreground text-lg">Start free. Upgrade when you need more.</p>
+      </motion.div>
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[
+          { name: "Free", price: "$0", period: "forever", features: ["25 testimonials", "1 widget", "Email collection", "Basic forms"], cta: "Start free" },
+          { name: "Starter", price: "$29", period: "/mo", features: ["Unlimited testimonials", "Video + audio + text", "100 SMS/mo", "5 widgets", "AI interview mode"], cta: "Start trial" },
+          { name: "Pro", price: "$79", period: "/mo", popular: true, features: ["Everything in Starter", "Revenue attribution", "Smart review routing", "AI content generator", "Advanced analytics"], cta: "Start trial" },
+          { name: "Scale", price: "Custom", period: "", features: ["Everything in Pro", "Unlimited SMS", "Priority support", "Dedicated success manager"], cta: "Contact sales" },
+        ].map((tier) => (
+          <div key={tier.name} className={`relative bg-card rounded-xl p-6 border ${tier.popular ? "border-primary ring-2 ring-primary/20" : "border-border"}`}>
+            {tier.popular && (
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">
+                Most popular
+              </div>
+            )}
+            <div className="mb-1 text-sm font-medium text-muted-foreground">{tier.name}</div>
+            <div className="flex items-baseline gap-1 mb-4">
+              <span className="text-3xl font-bold text-foreground">{tier.price}</span>
+              <span className="text-sm text-muted-foreground">{tier.period}</span>
+            </div>
+            <ul className="space-y-2 mb-6">
+              {tier.features.map((f) => (
+                <li key={f} className="flex items-start gap-2 text-sm text-foreground">
+                  <Check className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+            <Button asChild className="w-full" variant={tier.popular ? "default" : "outline"}>
+              <Link to="/auth">{tier.cta}</Link>
+            </Button>
+          </div>
+        ))}
       </div>
+      <p className="text-center text-xs text-muted-foreground mt-8">
+        14-day free trial on paid plans. No credit card required.
+      </p>
     </div>
   </section>
 );
@@ -385,7 +424,7 @@ const Metrics = () => (
     <div className="max-w-5xl mx-auto text-center">
       <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
         <span className="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4 block">Results</span>
-        <h2 className="text-3xl md:text-5xl font-bold text-foreground">Numbers that speak louder</h2>
+        <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground">Numbers that speak louder</h2>
         <p className="mt-4 text-muted-foreground text-lg max-w-xl mx-auto">Happy Client users see measurable results within their first 30 days.</p>
       </motion.div>
       <motion.div
@@ -479,7 +518,7 @@ const FinalCta = ({ isLoggedIn }: { isLoggedIn: boolean }) => (
       viewport={{ once: true }}
       className="max-w-3xl mx-auto text-center"
     >
-      <h2 className="text-3xl md:text-5xl font-bold text-foreground leading-tight">
+      <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground leading-tight">
         Ready to turn your clients into your <span className="text-primary">sales team</span>?
       </h2>
       <p className="mt-6 text-lg text-muted-foreground max-w-xl mx-auto">
@@ -525,8 +564,10 @@ const Index = () => {
       <Nav isLoggedIn={isLoggedIn} />
       <Hero isLoggedIn={isLoggedIn} />
       <LogoCloud />
+      <ProblemSolution />
       <HowItWorks />
       <FeatureShowcase />
+      <Pricing />
       <Metrics />
       <TestimonialQuote />
       <TrustBar />

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { lovable } from "@/integrations/lovable/index";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,11 +22,14 @@ export default function Auth() {
   const [signUpName, setSignUpName] = useState("");
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
+  const [signUpConfirmPassword, setSignUpConfirmPassword] = useState("");
+  const [acceptedTos, setAcceptedTos] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [isSigningUp, setIsSigningUp] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isMagicLinkLoading, setIsMagicLinkLoading] = useState(false);
   const [magicLinkMode, setMagicLinkMode] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -49,6 +53,14 @@ export default function Auth() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (signUpPassword !== signUpConfirmPassword) {
+      toast({ title: "Passwords don't match", variant: "destructive" });
+      return;
+    }
+    if (signUpPassword.length < 8) {
+      toast({ title: "Password must be at least 8 characters", variant: "destructive" });
+      return;
+    }
     setIsSigningUp(true);
     const { error } = await signUp(signUpEmail, signUpPassword, signUpName);
     setIsSigningUp(false);
@@ -57,6 +69,20 @@ export default function Auth() {
     } else {
       toast({ title: "Check your email", description: "We sent you a confirmation link to verify your account." });
     }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!signInEmail) {
+      toast({ title: "Enter your email above first.", variant: "destructive" });
+      return;
+    }
+    setIsResettingPassword(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(signInEmail, {
+      redirectTo: `${window.location.origin}/auth`,
+    });
+    setIsResettingPassword(false);
+    if (error) toast({ title: "Couldn't send reset link", description: error.message, variant: "destructive" });
+    else toast({ title: "Check your inbox for a password reset link." });
   };
 
   const handleMagicLink = async (e: React.FormEvent) => {
@@ -179,6 +205,14 @@ export default function Auth() {
                         onChange={(e) => setSignInPassword(e.target.value)}
                         required
                       />
+                      <button
+                        type="button"
+                        onClick={handleForgotPassword}
+                        disabled={isResettingPassword}
+                        className="text-xs text-primary hover:underline self-end block ml-auto mt-1"
+                      >
+                        {isResettingPassword ? "Sending…" : "Forgot password?"}
+                      </button>
                     </div>
                     <Button type="submit" className="w-full" disabled={isSigningIn}>
                       {isSigningIn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -229,10 +263,33 @@ export default function Auth() {
                       value={signUpPassword}
                       onChange={(e) => setSignUpPassword(e.target.value)}
                       required
-                      minLength={6}
+                      minLength={8}
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={isSigningUp}>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-confirm">Confirm Password</Label>
+                    <Input
+                      id="signup-confirm"
+                      type="password"
+                      placeholder="••••••••"
+                      value={signUpConfirmPassword}
+                      onChange={(e) => setSignUpConfirmPassword(e.target.value)}
+                      required
+                      minLength={8}
+                    />
+                  </div>
+                  <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={acceptedTos}
+                      onChange={(e) => setAcceptedTos(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      I agree to the <a href="/terms" className="text-primary hover:underline">Terms of Service</a> and <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a>.
+                    </span>
+                  </label>
+                  <Button type="submit" className="w-full" disabled={isSigningUp || !acceptedTos}>
                     {isSigningUp && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Create Account
                   </Button>
