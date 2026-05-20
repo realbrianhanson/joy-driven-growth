@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Copy, Monitor, Smartphone, GripVertical, Trash2, Sparkles, Loader2 } from "lucide-react";
+import { ArrowLeft, Copy, Monitor, Smartphone, GripVertical, Trash2, Sparkles, Loader2, Star, Type, AlignLeft, Video, Mic, ListChecks, Smile, Plus } from "lucide-react";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useForm as useFormData, useCreateForm, useUpdateForm } from "@/hooks/use-forms";
 import { supabase } from "@/integrations/supabase/client";
