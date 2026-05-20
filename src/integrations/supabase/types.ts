@@ -590,9 +590,17 @@ export type Database = {
           author_name: string
           author_title: string | null
           collected_at: string | null
+          consent_given: boolean
+          consent_text: string | null
+          consent_timestamp: string | null
           content: string | null
           created_at: string
           custom_fields: Json | null
+          developed_at: string | null
+          developed_content: string | null
+          developed_one_liner: string | null
+          developed_pull_quote: string | null
+          display_preference: string
           form_id: string | null
           id: string
           is_featured: boolean | null
@@ -619,9 +627,17 @@ export type Database = {
           author_name: string
           author_title?: string | null
           collected_at?: string | null
+          consent_given?: boolean
+          consent_text?: string | null
+          consent_timestamp?: string | null
           content?: string | null
           created_at?: string
           custom_fields?: Json | null
+          developed_at?: string | null
+          developed_content?: string | null
+          developed_one_liner?: string | null
+          developed_pull_quote?: string | null
+          display_preference?: string
           form_id?: string | null
           id?: string
           is_featured?: boolean | null
@@ -648,9 +664,17 @@ export type Database = {
           author_name?: string
           author_title?: string | null
           collected_at?: string | null
+          consent_given?: boolean
+          consent_text?: string | null
+          consent_timestamp?: string | null
           content?: string | null
           created_at?: string
           custom_fields?: Json | null
+          developed_at?: string | null
+          developed_content?: string | null
+          developed_one_liner?: string | null
+          developed_pull_quote?: string | null
+          display_preference?: string
           form_id?: string | null
           id?: string
           is_featured?: boolean | null

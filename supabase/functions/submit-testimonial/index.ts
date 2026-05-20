@@ -81,6 +81,19 @@ Deno.serve(async (req) => {
   if (type === 'audio' && !body.audio_url) return json({ error: 'missing_audio_url' }, 400)
 
   const rating = body.rating != null ? Math.max(1, Math.min(5, parseInt(body.rating))) : null
+
+  const allowedDisplay = ['full', 'first_initial', 'anonymous'] as const
+  const display_preference = allowedDisplay.includes(body.display_preference)
+    ? body.display_preference
+    : 'full'
+  const consent_given = body.consent_given === true
+  const consent_text_raw = body.consent_text != null ? String(body.consent_text) : null
+  if (consent_text_raw && consent_text_raw.length > 2000) {
+    return json({ error: 'invalid_consent_text' }, 400)
+  }
+  const consent_text = consent_text_raw
+  const consent_timestamp = consent_given ? new Date().toISOString() : null
+
   const insert = {
     user_id: ownerUserId!,
     form_id: formId,
@@ -96,6 +109,10 @@ Deno.serve(async (req) => {
     custom_fields: body.custom_fields && typeof body.custom_fields === 'object' ? body.custom_fields : {},
     status: 'pending',
     source,
+    consent_given,
+    consent_text,
+    consent_timestamp,
+    display_preference,
   }
 
   const { data: inserted, error: insErr } = await supabase
