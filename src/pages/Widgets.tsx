@@ -1,26 +1,22 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { 
-  Plus, 
-  Search, 
-  LayoutGrid, 
-  Bell, 
-  MessageSquare, 
+import {
+  Plus,
+  Search,
+  LayoutGrid,
+  Bell,
+  MessageSquare,
   Award,
   Eye,
   MousePointer,
-  DollarSign,
   MoreVertical,
   Edit,
-  Copy,
   Trash2,
   ExternalLink,
   BarChart3,
   Grid3X3,
   Star,
-  Rows3,
-  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,22 +34,22 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 
 const widgetTypes = [
-  { id: 'carousel', icon: '🎠', name: 'Carousel', description: 'Rotating showcase' },
-  { id: 'grid', icon: '📱', name: 'Grid', description: 'Beautiful masonry' },
-  { id: 'single', icon: '⭐', name: 'Single', description: 'Featured single' },
-  { id: 'fomo', icon: '🔔', name: 'FOMO Popup', description: 'Real-time social proof', isNew: true },
-  { id: 'popup', icon: '💬', name: 'Popup', description: 'Slide-in alerts', isNew: true },
-  { id: 'inline', icon: '🏷️', name: 'Inline', description: 'Compact trust signal' },
+  { id: 'carousel', Icon: LayoutGrid, name: 'Carousel', description: 'Rotating showcase' },
+  { id: 'grid', Icon: Grid3X3, name: 'Grid', description: 'Beautiful masonry' },
+  { id: 'single', Icon: Star, name: 'Single', description: 'Featured single' },
+  { id: 'fomo', Icon: Bell, name: 'FOMO Popup', description: 'Real-time social proof', isNew: true },
+  { id: 'popup', Icon: MessageSquare, name: 'Popup', description: 'Slide-in alerts', isNew: true },
+  { id: 'inline', Icon: Award, name: 'Inline', description: 'Compact trust signal' },
 ];
 
 const getWidgetTypeInfo = (type: string) => {
-  const typeMap: Record<string, { icon: string; label: string; IconComponent: any }> = {
-    carousel: { icon: '🎠', label: 'Carousel', IconComponent: LayoutGrid },
-    grid: { icon: '📱', label: 'Grid', IconComponent: Grid3X3 },
-    single: { icon: '⭐', label: 'Single', IconComponent: Star },
-    popup: { icon: '💬', label: 'Popup', IconComponent: MessageSquare },
-    fomo: { icon: '🔔', label: 'FOMO', IconComponent: Bell },
-    inline: { icon: '🏷️', label: 'Inline', IconComponent: Award },
+  const typeMap: Record<string, { label: string; IconComponent: any }> = {
+    carousel: { label: 'Carousel', IconComponent: LayoutGrid },
+    grid: { label: 'Grid', IconComponent: Grid3X3 },
+    single: { label: 'Single', IconComponent: Star },
+    popup: { label: 'Popup', IconComponent: MessageSquare },
+    fomo: { label: 'FOMO', IconComponent: Bell },
+    inline: { label: 'Inline', IconComponent: Award },
   };
   return typeMap[type] || typeMap.carousel;
 };
@@ -107,22 +103,28 @@ const Widgets = () => {
     widget.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const activeCount = widgets.filter((w: any) => w.is_active).length;
+
   return (
     <div className="min-h-screen bg-background">
-      <div className="container max-w-7xl mx-auto py-8 px-4">
+      <div className="max-w-6xl mx-auto px-6 py-10">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div className="flex items-end justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-display font-bold text-foreground flex items-center gap-2">
-              Popups & Widgets 🔔
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Show off your happy clients everywhere
+            <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Widgets</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              <span className="tabular-nums">{widgets.length}</span> total
+              {activeCount > 0 && (
+                <>
+                  <span className="mx-1.5 text-border">·</span>
+                  <span className="tabular-nums">{activeCount}</span> active
+                </>
+              )}
             </p>
           </div>
           <Link to="/dashboard/widgets/new">
-            <Button className="gradient-sunny text-white shadow-warm hover:shadow-warm-lg transition-all">
-              <Plus className="w-4 h-4 mr-2" />
+            <Button size="sm">
+              <Plus className="w-4 h-4 mr-1.5" />
               New Widget
             </Button>
           </Link>
@@ -130,22 +132,22 @@ const Widgets = () => {
 
         {/* Widget Type Cards */}
         <div className="mb-8">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Create New Widget</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <h2 className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground mb-3">Create New Widget</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
             {widgetTypes.map((type) => (
               <Link key={type.id} to={`/dashboard/widgets/new?type=${type.id}`}>
-                <Card className="bg-card hover:border-primary/50 hover:shadow-warm transition-all cursor-pointer group h-full">
-                  <CardContent className="p-4 text-center">
-                    <div className="text-3xl mb-2 group-hover:scale-110 transition-transform">
-                      {type.icon}
+                <Card className="bg-card border border-border hover:border-border-hover hover:bg-primary-light/30 transition-colors cursor-pointer h-full rounded-xl shadow-none">
+                  <CardContent className="p-4">
+                    <div className="w-8 h-8 rounded-lg bg-primary-light flex items-center justify-center mb-3">
+                      <type.Icon className="w-4 h-4 text-primary" />
                     </div>
-                    <div className="font-medium text-sm text-foreground flex items-center justify-center gap-1">
+                    <div className="font-medium text-sm text-foreground flex items-center gap-1.5">
                       {type.name}
                       {type.isNew && (
-                        <Badge className="bg-emerald text-white text-[10px] px-1 py-0">NEW</Badge>
+                        <span className="text-[9px] uppercase tracking-wider font-medium text-primary">New</span>
                       )}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1">{type.description}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{type.description}</div>
                   </CardContent>
                 </Card>
               </Link>
@@ -154,14 +156,14 @@ const Widgets = () => {
         </div>
 
         {/* Search */}
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center gap-4 mb-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search widgets..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-card border-border focus:border-primary focus:ring-primary/20"
+              className="pl-10 h-9 bg-card border-border"
             />
           </div>
         </div>
@@ -177,63 +179,64 @@ const Widgets = () => {
 
         {/* Widgets Grid */}
         {!isLoading && (
-          <div className="grid gap-4">
+          <div className="grid gap-2">
             {filteredWidgets.map((widget) => {
               const typeInfo = getWidgetTypeInfo(widget.type || 'carousel');
               const ctr = widget.impressions && widget.impressions > 0
                 ? ((widget.clicks || 0) / widget.impressions * 100).toFixed(1)
                 : '0.0';
               return (
-                <Card key={widget.id} className="bg-card hover:border-primary/30 hover:shadow-warm transition-all group">
-                  <CardContent className="p-6">
+                <Card key={widget.id} className="bg-card border border-border hover:border-border-hover transition-colors rounded-xl shadow-none">
+                  <CardContent className="p-4">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-                          {typeInfo.icon}
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-lg bg-primary-light flex items-center justify-center shrink-0">
+                          <typeInfo.IconComponent className="w-4 h-4 text-primary" />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-foreground">{widget.name}</h3>
-                            <Badge variant={widget.is_active ? 'default' : 'secondary'} className={widget.is_active ? 'bg-emerald text-white' : ''}>
-                              {widget.is_active ? '🟢 Active' : '⚫ Inactive'}
-                            </Badge>
+                            <h3 className="font-semibold text-foreground text-[15px] truncate">{widget.name}</h3>
+                            <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-medium text-muted-foreground">
+                              <span
+                                className={`inline-block w-1.5 h-1.5 rounded-full ${widget.is_active ? 'bg-success' : 'bg-muted-foreground/40'}`}
+                                aria-hidden
+                              />
+                              {widget.is_active ? 'Active' : 'Inactive'}
+                            </span>
                           </div>
-                          <div className="text-sm text-muted-foreground flex items-center gap-1">
-                            <typeInfo.IconComponent className="w-3 h-3" />
-                            {typeInfo.label}
-                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">{typeInfo.label}</div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-8">
+                      <div className="flex items-center gap-6">
                         <div className="hidden md:flex items-center gap-6">
-                          <div className="text-center">
-                            <div className="flex items-center gap-1 text-muted-foreground text-sm"><Eye className="w-3.5 h-3.5" />Views</div>
-                            <div className="font-semibold text-foreground">{formatNumber(widget.impressions || 0)}</div>
+                          <div className="text-right">
+                            <div className="flex items-center justify-end gap-1 text-[10px] uppercase tracking-wider font-medium text-muted-foreground"><Eye className="w-3 h-3" />Views</div>
+                            <div className="font-semibold text-foreground tabular-nums text-sm mt-0.5">{formatNumber(widget.impressions || 0)}</div>
                           </div>
-                          <div className="text-center">
-                            <div className="flex items-center gap-1 text-muted-foreground text-sm"><MousePointer className="w-3.5 h-3.5" />Clicks</div>
-                            <div className="font-semibold text-foreground">{formatNumber(widget.clicks || 0)}</div>
+                          <div className="text-right">
+                            <div className="flex items-center justify-end gap-1 text-[10px] uppercase tracking-wider font-medium text-muted-foreground"><MousePointer className="w-3 h-3" />Clicks</div>
+                            <div className="font-semibold text-foreground tabular-nums text-sm mt-0.5">{formatNumber(widget.clicks || 0)}</div>
                           </div>
-                          <div className="text-center">
-                            <div className="flex items-center gap-1 text-muted-foreground text-sm"><BarChart3 className="w-3.5 h-3.5" />CTR</div>
-                            <div className="font-semibold text-foreground">{ctr}%</div>
+                          <div className="text-right">
+                            <div className="flex items-center justify-end gap-1 text-[10px] uppercase tracking-wider font-medium text-muted-foreground"><BarChart3 className="w-3 h-3" />CTR</div>
+                            <div className="font-semibold text-foreground tabular-nums text-sm mt-0.5">{ctr}%</div>
                           </div>
-                          <div className="text-center">
-                            <div className="flex items-center gap-1 text-gold text-sm"><DollarSign className="w-3.5 h-3.5" />Revenue</div>
-                            <div className="font-semibold text-gold">{formatCurrency(Number(widget.revenue_attributed) || 0)}</div>
+                          <div className="text-right">
+                            <div className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Revenue</div>
+                            <div className="font-semibold text-foreground tabular-nums text-sm mt-0.5">{formatCurrency(Number(widget.revenue_attributed) || 0)}</div>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           <Link to={`/dashboard/widgets/${widget.id}`}>
-                            <Button variant="outline" size="sm" className="border-border hover:border-primary hover:bg-primary/5">
-                              <Edit className="w-4 h-4" />
+                            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                              <Edit className="w-3.5 h-3.5" />
                             </Button>
                           </Link>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm"><MoreVertical className="w-4 h-4" /></Button>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"><MoreVertical className="w-4 h-4" /></Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="bg-card border-border">
                               <DropdownMenuItem className="cursor-pointer"><ExternalLink className="w-4 h-4 mr-2" />Preview</DropdownMenuItem>
@@ -247,10 +250,11 @@ const Widgets = () => {
                     </div>
 
                     {/* Mobile Stats */}
-                    <div className="flex md:hidden items-center gap-4 mt-4 pt-4 border-t border-border">
-                      <div className="flex items-center gap-1 text-sm"><Eye className="w-3.5 h-3.5 text-muted-foreground" /><span className="font-medium">{formatNumber(widget.impressions || 0)}</span></div>
-                      <div className="flex items-center gap-1 text-sm"><MousePointer className="w-3.5 h-3.5 text-muted-foreground" /><span className="font-medium">{formatNumber(widget.clicks || 0)}</span></div>
-                      <div className="flex items-center gap-1 text-sm text-gold"><DollarSign className="w-3.5 h-3.5" /><span className="font-medium">{formatCurrency(Number(widget.revenue_attributed) || 0)}</span></div>
+                    <div className="flex md:hidden items-center gap-4 mt-3 pt-3 border-t border-border">
+                      <div className="flex items-center gap-1 text-xs"><Eye className="w-3 h-3 text-muted-foreground" /><span className="font-medium tabular-nums">{formatNumber(widget.impressions || 0)}</span></div>
+                      <div className="flex items-center gap-1 text-xs"><MousePointer className="w-3 h-3 text-muted-foreground" /><span className="font-medium tabular-nums">{formatNumber(widget.clicks || 0)}</span></div>
+                      <div className="flex items-center gap-1 text-xs"><BarChart3 className="w-3 h-3 text-muted-foreground" /><span className="font-medium tabular-nums">{ctr}%</span></div>
+                      <div className="text-xs ml-auto"><span className="font-medium tabular-nums">{formatCurrency(Number(widget.revenue_attributed) || 0)}</span></div>
                     </div>
                   </CardContent>
                 </Card>
@@ -260,12 +264,14 @@ const Widgets = () => {
         )}
 
         {!isLoading && filteredWidgets.length === 0 && (
-          <div className="text-center py-16">
-            <div className="text-6xl mb-4">🔔</div>
-            <h3 className="text-xl font-semibold text-foreground mb-2">No widgets yet</h3>
-            <p className="text-muted-foreground mb-6">Create your first widget to start showcasing testimonials</p>
+          <div className="text-center py-24 border border-dashed border-border rounded-xl">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-light mb-4">
+              <Bell className="w-5 h-5 text-primary" />
+            </div>
+            <h3 className="text-base font-semibold text-foreground mb-1.5">No widgets yet</h3>
+            <p className="text-sm text-muted-foreground mb-5">Create your first widget to start showcasing testimonials</p>
             <Link to="/dashboard/widgets/new">
-              <Button className="gradient-sunny text-white"><Plus className="w-4 h-4 mr-2" />Create Widget</Button>
+              <Button size="sm"><Plus className="w-4 h-4 mr-1.5" />Create Widget</Button>
             </Link>
           </div>
         )}
