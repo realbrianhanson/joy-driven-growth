@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.send-team-invite]
 verify_jwt = true
+
+[functions.develop-testimonial]
+verify_jwt = true
