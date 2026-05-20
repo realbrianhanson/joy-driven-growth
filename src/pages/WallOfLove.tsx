@@ -12,13 +12,16 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { useDemoMode } from "@/contexts/DemoModeContext";
+import { MOCK_WALLS } from "@/data/mock/walls";
 
 const WallOfLove = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
+  const { isDemoMode } = useDemoMode();
 
-  const { data: walls = [], isLoading } = useQuery({
+  const { data: realWalls = [], isLoading: realLoading } = useQuery({
     queryKey: ['walls', user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -26,8 +29,11 @@ const WallOfLove = () => {
       if (error) throw error;
       return data;
     },
-    enabled: !!user,
+    enabled: !!user && !isDemoMode,
   });
+
+  const walls: any[] = isDemoMode ? (MOCK_WALLS as any[]) : realWalls;
+  const isLoading = isDemoMode ? false : realLoading;
 
   const deleteWall = useMutation({
     mutationFn: async (wallId: string) => {

@@ -32,6 +32,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { useDemoMode } from "@/contexts/DemoModeContext";
+import { MOCK_WIDGETS } from "@/data/mock/widgets";
 
 const widgetTypes = [
   { id: 'carousel', Icon: LayoutGrid, name: 'Carousel', description: 'Rotating showcase' },
@@ -71,8 +73,9 @@ const Widgets = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
+  const { isDemoMode } = useDemoMode();
 
-  const { data: widgets = [], isLoading } = useQuery({
+  const { data: realWidgets = [], isLoading: realLoading } = useQuery({
     queryKey: ['widgets', user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -84,8 +87,11 @@ const Widgets = () => {
       if (error) throw error;
       return data;
     },
-    enabled: !!user,
+    enabled: !!user && !isDemoMode,
   });
+
+  const widgets: any[] = isDemoMode ? (MOCK_WIDGETS as any[]) : realWidgets;
+  const isLoading = isDemoMode ? false : realLoading;
 
   const deleteWidget = useMutation({
     mutationFn: async (widgetId: string) => {
