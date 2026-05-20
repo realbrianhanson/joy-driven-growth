@@ -1,4 +1,4 @@
-import { Star, Copy, Play, Pause, Check, X, Edit, Download, Maximize, ChevronRight, Sparkles } from "lucide-react";
+import { Star, Copy, Play, Pause, Check, X, Edit, Download, Maximize, ChevronRight, Sparkles, Wand2, Loader2, ShieldCheck, ShieldOff } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +35,11 @@ interface TestimonialDetailProps {
     email?: string;
     location?: string;
     verified?: boolean;
+    developedContent?: string | null;
+    developedPullQuote?: string | null;
+    developedOneLiner?: string | null;
+    customFields?: Record<string, unknown> | null;
+    consentGiven?: boolean;
   };
   aiAnalysis?: AiAnalysis;
   revenueData?: RevenueAttribution;
@@ -46,6 +51,8 @@ interface TestimonialDetailProps {
   onClose?: () => void;
   isAnalyzing?: boolean;
   onRefreshAnalysis?: () => void;
+  onDevelop?: () => void;
+  isDeveloping?: boolean;
 }
 
 const sentimentConfig = {
@@ -73,6 +80,8 @@ export function TestimonialDetail({
   onClose,
   isAnalyzing,
   onRefreshAnalysis,
+  onDevelop,
+  isDeveloping,
 }: TestimonialDetailProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [copiedQuote, setCopiedQuote] = useState<string | null>(null);
