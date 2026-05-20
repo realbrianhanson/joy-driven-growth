@@ -79,6 +79,7 @@ const AnimatedRoutes = () => {
         <Route path="/dashboard/testimonials" element={<DashboardRoute><Testimonials /></DashboardRoute>} />
         <Route path="/dashboard/testimonials/:id" element={<DashboardRoute><Testimonials /></DashboardRoute>} />
         <Route path="/dashboard/forms" element={<DashboardRoute><Forms /></DashboardRoute>} />
+        <Route path="/dashboard/forms/new" element={<DashboardRoute><FormBuilder /></DashboardRoute>} />
         <Route path="/dashboard/forms/:id/edit" element={<DashboardRoute><FormBuilder /></DashboardRoute>} />
         <Route path="/dashboard/campaigns" element={<DashboardRoute><Campaigns /></DashboardRoute>} />
         <Route path="/dashboard/campaigns/new" element={<DashboardRoute><CampaignBuilder /></DashboardRoute>} />

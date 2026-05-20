@@ -147,7 +147,7 @@ export default function FormBuilder() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { toast } = useToast();
-  const isNew = id === "new";
+  const isNew = !id || id === "new";
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -200,32 +200,34 @@ export default function FormBuilder() {
   useEffect(() => {
     if (existingForm && !initialized) {
       const cq = existingForm.custom_questions as any;
+      const persisted = cq?.settings ?? {};
+      const routing = persisted.review_routing ?? {};
       setSettings({
         name: existingForm.name,
         slug: existingForm.slug,
         status: existingForm.is_published ?? false,
         brandColor: existingForm.primary_color ?? "#6366F1",
         logo: existingForm.logo_url ?? undefined,
-        welcomeEnabled: true,
+        welcomeEnabled: persisted.welcome_enabled ?? true,
         welcomeTitle: existingForm.welcome_title ?? "Hey there!",
         welcomeMessage: existingForm.welcome_message ?? "",
         thankYouTitle: existingForm.thank_you_title ?? "Thank you!",
         thankYouMessage: existingForm.thank_you_message ?? "",
-        confettiEnabled: true,
+        confettiEnabled: persisted.confetti_enabled ?? true,
         collectText: existingForm.collect_text ?? true,
         collectVideo: existingForm.collect_video ?? true,
         collectAudio: existingForm.collect_audio ?? false,
-        letThemChoose: true,
-        videoMaxLength: 60,
+        letThemChoose: persisted.let_them_choose ?? true,
+        videoMaxLength: persisted.video_max_length ?? 60,
         aiInterviewEnabled: cq?.ai_enabled ?? false,
         aiCustomPrompt: cq?.ai_prompt ?? defaultSettings.aiCustomPrompt,
         incentiveEnabled: existingForm.incentive_enabled ?? false,
         incentiveType: (existingForm.incentive_type as any) ?? "discount",
         incentiveValue: existingForm.incentive_value ?? "10%",
-        reviewRoutingEnabled: false,
-        positiveThreshold: 4,
-        positiveAction: "google",
-        negativeAction: "support@example.com",
+        reviewRoutingEnabled: routing.enabled ?? false,
+        positiveThreshold: routing.positive_threshold ?? 4,
+        positiveAction: routing.positive_action ?? "google",
+        negativeAction: routing.negative_action ?? "support@example.com",
       });
       if (cq?.questions && Array.isArray(cq.questions)) {
         setQuestions(cq.questions);
@@ -254,7 +256,7 @@ export default function FormBuilder() {
       collect_text: settings.collectText,
       collect_video: settings.collectVideo,
       collect_audio: settings.collectAudio,
-      require_rating: true,
+      require_rating: questions.some((q) => q.type === "rating" && q.required),
       incentive_enabled: settings.incentiveEnabled,
       incentive_type: settings.incentiveType,
       incentive_value: settings.incentiveValue,
@@ -262,6 +264,18 @@ export default function FormBuilder() {
         ai_enabled: settings.aiInterviewEnabled,
         ai_prompt: settings.aiCustomPrompt,
         questions,
+        settings: {
+          welcome_enabled: settings.welcomeEnabled,
+          confetti_enabled: settings.confettiEnabled,
+          let_them_choose: settings.letThemChoose,
+          video_max_length: settings.videoMaxLength,
+          review_routing: {
+            enabled: settings.reviewRoutingEnabled,
+            positive_threshold: settings.positiveThreshold,
+            positive_action: settings.positiveAction,
+            negative_action: settings.negativeAction,
+          },
+        },
       })),
     };
 
