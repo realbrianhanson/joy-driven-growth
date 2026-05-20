@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,23 +23,10 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
 
-  const apiKey = req.headers.get('x-api-key') || ''
-  if (!apiKey || apiKey.length < 20) return json({ error: 'missing_api_key' }, 401)
-
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   )
-
-  const keyHash = await sha256Hex(apiKey)
-  const { data: keyRow, error: keyErr } = await supabase
-    .from('api_keys')
-    .select('id, user_id, revoked_at')
-    .eq('key_hash', keyHash)
-    .maybeSingle()
-
-  if (keyErr || !keyRow) return json({ error: 'invalid_api_key' }, 401)
-  if (keyRow.revoked_at) return json({ error: 'revoked_api_key' }, 401)
 
   let body: any
   try {
@@ -48,23 +35,67 @@ Deno.serve(async (req) => {
     return json({ error: 'invalid_json' }, 400)
   }
 
+  // ── Resolve owner: either by form_slug (public form) or x-api-key (developer API) ──
+  let ownerUserId: string | null = null
+  let formId: string | null = null
+  let source = 'api'
+  let apiKeyRowId: string | null = null
+
+  const formSlug = body.form_slug ? String(body.form_slug) : null
+  const apiKey = req.headers.get('x-api-key') || ''
+
+  if (formSlug) {
+    const { data: form, error: formErr } = await supabase
+      .from('forms')
+      .select('id, user_id, is_published')
+      .eq('slug', formSlug)
+      .maybeSingle()
+    if (formErr || !form) return json({ error: 'form_not_found' }, 404)
+    if (!form.is_published) return json({ error: 'form_not_published' }, 403)
+    ownerUserId = form.user_id
+    formId = form.id
+    source = body.source ? String(body.source) : 'form'
+  } else {
+    if (!apiKey || apiKey.length < 20) return json({ error: 'missing_api_key_or_form_slug' }, 401)
+    const keyHash = await sha256Hex(apiKey)
+    const { data: keyRow, error: keyErr } = await supabase
+      .from('api_keys')
+      .select('id, user_id, revoked_at')
+      .eq('key_hash', keyHash)
+      .maybeSingle()
+    if (keyErr || !keyRow) return json({ error: 'invalid_api_key' }, 401)
+    if (keyRow.revoked_at) return json({ error: 'revoked_api_key' }, 401)
+    ownerUserId = keyRow.user_id
+    apiKeyRowId = keyRow.id
+  }
+
   const author_name = (body.author_name || '').toString().trim()
   const content = (body.content || '').toString().trim()
   if (!author_name || author_name.length > 200) return json({ error: 'invalid_author_name' }, 400)
-  if (!content || content.length > 4000) return json({ error: 'invalid_content' }, 400)
+  if (content.length > 4000) return json({ error: 'invalid_content' }, 400)
+
+  const type = ['text', 'video', 'audio'].includes(body.type) ? body.type : 'text'
+  // Text submissions require content; video/audio can stand on their own
+  if (type === 'text' && !content) return json({ error: 'invalid_content' }, 400)
+  if (type === 'video' && !body.video_url) return json({ error: 'missing_video_url' }, 400)
+  if (type === 'audio' && !body.audio_url) return json({ error: 'missing_audio_url' }, 400)
 
   const rating = body.rating != null ? Math.max(1, Math.min(5, parseInt(body.rating))) : null
   const insert = {
-    user_id: keyRow.user_id,
+    user_id: ownerUserId!,
+    form_id: formId,
     author_name,
     author_email: body.author_email ? String(body.author_email).slice(0, 200) : null,
     author_title: body.author_title ? String(body.author_title).slice(0, 200) : null,
     author_company: body.author_company ? String(body.author_company).slice(0, 200) : null,
-    content,
+    content: content || null,
     rating,
-    type: 'text',
+    type,
+    video_url: body.video_url ? String(body.video_url) : null,
+    audio_url: body.audio_url ? String(body.audio_url) : null,
+    custom_fields: body.custom_fields && typeof body.custom_fields === 'object' ? body.custom_fields : {},
     status: 'pending',
-    source: 'api',
+    source,
   }
 
   const { data: inserted, error: insErr } = await supabase
@@ -75,10 +106,16 @@ Deno.serve(async (req) => {
 
   if (insErr) return json({ error: 'insert_failed', detail: insErr.message }, 500)
 
-  await supabase
-    .from('api_keys')
-    .update({ last_used_at: new Date().toISOString() })
-    .eq('id', keyRow.id)
+  if (apiKeyRowId) {
+    await supabase
+      .from('api_keys')
+      .update({ last_used_at: new Date().toISOString() })
+      .eq('id', apiKeyRowId)
+  }
+
+  if (formId) {
+    await supabase.rpc('increment_form_submissions', { form_id: formId })
+  }
 
   return json({ ok: true, testimonial: inserted })
 })
