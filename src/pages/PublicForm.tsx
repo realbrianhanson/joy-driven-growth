@@ -11,8 +11,9 @@ import { VideoRecorder } from "@/components/testimonials/VideoRecorder";
 import { AudioRecorder } from "@/components/testimonials/AudioRecorder";
 import { useFormBySlug } from "@/hooks/use-forms";
 import { supabase } from "@/integrations/supabase/client";
+import { DEFAULT_CONSENT_TEMPLATE, DISPLAY_PREFERENCE_OPTIONS, renderConsentText, type DisplayPreference } from "@/lib/consent";
 
-type FormStep = "welcome" | "info" | "type" | "rating" | "content" | "custom" | "uploading" | "thankyou";
+type FormStep = "welcome" | "info" | "type" | "rating" | "content" | "custom" | "consent" | "uploading" | "thankyou";
 type TestimonialType = "text" | "video" | "audio";
 
 interface CustomQuestion {
@@ -20,6 +21,7 @@ interface CustomQuestion {
   type: "short_text" | "long_text" | "rating" | "multiple_choice" | "sentiment";
   question: string;
   placeholder?: string;
+  helpText?: string;
   required?: boolean;
   options?: string[];
 }
@@ -41,6 +43,8 @@ export default function PublicForm() {
   const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [consentChecked, setConsentChecked] = useState(false);
+  const [displayPreference, setDisplayPreference] = useState<DisplayPreference>("full");
 
   const availableTypes = useMemo<TestimonialType[]>(() => {
     if (!form) return ["text"];
@@ -60,6 +64,22 @@ export default function PublicForm() {
     const cq = form?.custom_questions as { settings?: { video_max_length?: number } } | null;
     return cq?.settings?.video_max_length ?? 60;
   }, [form]);
+
+  const consentSettings = useMemo(() => {
+    const s = (form?.custom_questions as { settings?: { consent_enabled?: boolean; consent_text?: string; name_display_enabled?: boolean } } | null)?.settings ?? {};
+    return {
+      consentEnabled: s.consent_enabled ?? true,
+      consentText: s.consent_text ?? DEFAULT_CONSENT_TEMPLATE,
+      nameDisplayEnabled: s.name_display_enabled ?? true,
+    };
+  }, [form]);
+
+  const renderedConsentText = useMemo(
+    () => renderConsentText(consentSettings.consentText, authorCompany || (form as unknown as { company_name?: string } | null)?.company_name),
+    [consentSettings.consentText, authorCompany, form],
+  );
+
+  const needsConsentStep = consentSettings.consentEnabled || consentSettings.nameDisplayEnabled;
 
   const brandColor = form?.primary_color ?? "#F97316";
 
@@ -111,6 +131,9 @@ export default function PublicForm() {
           audio_url,
           custom_fields: customAnswers,
           source: "form",
+          consent_given: consentSettings.consentEnabled ? consentChecked : false,
+          consent_text: consentSettings.consentEnabled ? renderedConsentText : undefined,
+          display_preference: consentSettings.nameDisplayEnabled ? displayPreference : "full",
         },
       });
       if (error) throw error;
@@ -167,11 +190,13 @@ export default function PublicForm() {
     else if (step === "info") setStep(availableTypes.length > 1 ? "type" : "rating");
     else if (step === "type") setStep("rating");
     else if (step === "rating") setStep("content");
-    else if (step === "content") setStep(customQuestions.length > 0 ? "custom" : "uploading");
+    else if (step === "content") setStep(customQuestions.length > 0 ? "custom" : (needsConsentStep ? "consent" : "uploading"));
+    else if (step === "custom") setStep(needsConsentStep ? "consent" : "uploading");
   };
 
   const goBack = () => {
-    if (step === "custom") setStep("content");
+    if (step === "consent") setStep(customQuestions.length > 0 ? "custom" : "content");
+    else if (step === "custom") setStep("content");
     else if (step === "content") setStep("rating");
     else if (step === "rating") setStep(availableTypes.length > 1 ? "type" : "info");
     else if (step === "type") setStep("info");
@@ -179,7 +204,7 @@ export default function PublicForm() {
   };
 
   const stepIndex = (() => {
-    const order = ["info", availableTypes.length > 1 ? "type" : null, "rating", "content", customQuestions.length > 0 ? "custom" : null].filter(Boolean) as FormStep[];
+    const order = ["info", availableTypes.length > 1 ? "type" : null, "rating", "content", customQuestions.length > 0 ? "custom" : null, needsConsentStep ? "consent" : null].filter(Boolean) as FormStep[];
     return { current: Math.max(1, order.indexOf(step) + 1), total: order.length };
   })();
 
