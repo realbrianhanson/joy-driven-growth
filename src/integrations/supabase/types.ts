@@ -841,6 +841,17 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_invite_by_token: {
+        Args: { p_token: string }
+        Returns: {
+          email: string
+          expires_at: string
+          id: string
+          owner_user_id: string
+          role: string
+          status: string
+        }[]
+      }
       get_user_plan: { Args: { p_user_id: string }; Returns: string }
       get_wall_public: { Args: { p_slug: string }; Returns: Json }
       get_widget_public: { Args: { p_widget_id: string }; Returns: Json }
