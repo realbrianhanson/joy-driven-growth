@@ -2,13 +2,14 @@ import { useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useWorkspace } from "@/hooks/use-workspace";
 import { Star, DollarSign, Megaphone, Puzzle, MessageSquare, FileText } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export function useDashboard() {
-  const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
   const queryClient = useQueryClient();
-  const userId = user?.id;
+  const userId = workspaceOwnerId;
 
   // 1. Testimonials summary
   const testimonials = useQuery({

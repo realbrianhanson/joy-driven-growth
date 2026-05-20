@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
+import { useWorkspace } from "./use-workspace";
 
 function getDateRange(range: string): { start: Date; end: Date } {
   const end = new Date();
@@ -34,7 +35,8 @@ function getPreviousPeriod(range: string): { start: Date; end: Date } {
 }
 
 export function useAnalyticsData(dateRange: string) {
-  const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
+  const user = workspaceOwnerId ? { id: workspaceOwnerId } : null;
   const { start, end } = getDateRange(dateRange);
   const prev = getPreviousPeriod(dateRange);
 
