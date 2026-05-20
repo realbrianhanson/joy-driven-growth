@@ -17,11 +17,13 @@ import {
   Zap,
   Shield,
   Globe,
+  GitBranch,
+  Bot,
+  Bell,
+  MessageSquare,
+  Check,
 } from "lucide-react";
 import heroDashboard from "@/assets/hero-dashboard.jpg";
-import featureCollect from "@/assets/feature-collect.jpg";
-import featureRevenue from "@/assets/feature-revenue.jpg";
-import featureContent from "@/assets/feature-content.jpg";
 
 /* ─── Animations ─── */
 const fadeUp = {
