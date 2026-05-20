@@ -23,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useWorkspace } from "@/hooks/use-workspace";
 import { PUBLIC_APP_URL } from "@/lib/config";
 
 import { LayoutGrid, Grid3X3, Bell, MessageSquare, Award } from "lucide-react";
@@ -41,6 +42,7 @@ const WidgetBuilder = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
   const isNew = !id || id === 'new';
   const initialType = searchParams.get('type') || 'carousel';
 
@@ -81,19 +83,19 @@ const WidgetBuilder = () => {
 
   // Fetch approved testimonials
   const { data: testimonials = [], isLoading: loadingTestimonials } = useQuery({
-    queryKey: ['approved-testimonials', user?.id],
+    queryKey: ['approved-testimonials', workspaceOwnerId],
     queryFn: async () => {
-      if (!user) return [];
+      if (!workspaceOwnerId) return [];
       const { data, error } = await supabase
         .from('testimonials')
         .select('id, author_name, author_company, content, rating, revenue_attributed')
-        .eq('user_id', user.id)
+        .eq('user_id', workspaceOwnerId)
         .eq('status', 'approved')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!user,
+    enabled: !!workspaceOwnerId,
   });
 
   const filteredTestimonials = testimonials.filter(t =>
@@ -118,14 +120,14 @@ const WidgetBuilder = () => {
   };
 
   const handleSave = async () => {
-    if (!user || !widgetName.trim()) {
-      toast.error('Please enter a widget name');
+    if (!workspaceOwnerId || !widgetName.trim()) {
+      toast.error(!workspaceOwnerId ? 'Workspace not ready' : 'Please enter a widget name');
       return;
     }
     setIsSaving(true);
     try {
       const payload = {
-        user_id: user.id,
+        user_id: workspaceOwnerId,
         name: widgetName,
         type: widgetType as any,
         theme,

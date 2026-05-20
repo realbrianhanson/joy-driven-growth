@@ -47,6 +47,7 @@ import { toast } from "sonner";
 import { useAnalyticsData } from "@/hooks/use-analytics-data";
 import { useDemoMode } from "@/contexts/DemoModeContext";
 import { useAuth } from "@/hooks/use-auth";
+import { useWorkspace } from "@/hooks/use-workspace";
 import { supabase } from "@/integrations/supabase/client";
 import { MOCK_ANALYTICS_DATA, MOCK_WIDGET_DATA } from "@/data/mock/analytics";
 
@@ -55,6 +56,7 @@ const Analytics = () => {
   const [dateRange, setDateRange] = useState<"today" | "7d" | "30d" | "90d">("30d");
   const { isDemoMode } = useDemoMode();
   const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
   const analytics = useAnalyticsData(dateRange);
 
   const formatCurrency = (amount: number) =>
@@ -63,11 +65,11 @@ const Analytics = () => {
   const formatNumber = (num: number) => (num >= 1000 ? (num / 1000).toFixed(1) + "k" : num.toString());
 
   const handleExportCsv = async () => {
-    if (!user) return;
+    if (!workspaceOwnerId) return;
     const { data, error } = await supabase
       .from("testimonials")
       .select("created_at, author_name, author_email, author_company, content, rating, type, status, source, revenue_attributed")
-      .eq("user_id", user.id)
+      .eq("user_id", workspaceOwnerId)
       .order("created_at", { ascending: false });
     if (error) {
       toast.error("Export failed", { description: error.message });

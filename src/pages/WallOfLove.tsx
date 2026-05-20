@@ -11,25 +11,27 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useWorkspace } from "@/hooks/use-workspace";
 import { toast } from "sonner";
 import { useDemoMode } from "@/contexts/DemoModeContext";
 import { MOCK_WALLS } from "@/data/mock/walls";
 
 const WallOfLove = () => {
   const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const { isDemoMode } = useDemoMode();
 
   const { data: realWalls = [], isLoading: realLoading } = useQuery({
-    queryKey: ['walls', user?.id],
+    queryKey: ['walls', workspaceOwnerId],
     queryFn: async () => {
-      if (!user) return [];
-      const { data, error } = await supabase.from('walls').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+      if (!workspaceOwnerId) return [];
+      const { data, error } = await supabase.from('walls').select('*').eq('user_id', workspaceOwnerId).order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!user && !isDemoMode,
+    enabled: !!workspaceOwnerId && !isDemoMode,
   });
 
   const walls: any[] = isDemoMode ? (MOCK_WALLS as any[]) : realWalls;

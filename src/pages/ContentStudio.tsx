@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useWorkspace } from "@/hooks/use-workspace";
 import ContentRenderer, { flattenContent } from "@/components/content/ContentRenderer";
 
 interface ContentType {
@@ -45,6 +46,7 @@ interface GeneratedResult {
 
 const ContentStudio = () => {
   const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<'all' | 'top' | 'video' | 'revenue'>('all');
   const [selectedTestimonials, setSelectedTestimonials] = useState<string[]>([]);
@@ -55,19 +57,19 @@ const ContentStudio = () => {
 
   // Fetch real testimonials
   const { data: testimonials = [], isLoading } = useQuery({
-    queryKey: ['content-studio-testimonials', user?.id],
+    queryKey: ['content-studio-testimonials', workspaceOwnerId],
     queryFn: async () => {
-      if (!user) return [];
+      if (!workspaceOwnerId) return [];
       const { data, error } = await supabase
         .from('testimonials')
         .select('id, author_name, author_company, content, rating, revenue_attributed, type')
-        .eq('user_id', user.id)
+        .eq('user_id', workspaceOwnerId)
         .eq('status', 'approved')
         .order('revenue_attributed', { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!user,
+    enabled: !!workspaceOwnerId,
   });
 
   const filteredTestimonials = testimonials.filter(t => {
@@ -90,7 +92,7 @@ const ContentStudio = () => {
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount);
 
   const generateContent = async () => {
-    if (selectedTestimonials.length === 0 || !selectedContentType || !user) return;
+    if (selectedTestimonials.length === 0 || !selectedContentType || !workspaceOwnerId) return;
     setIsGenerating(true);
 
     try {
@@ -109,6 +111,7 @@ const ContentStudio = () => {
           })),
           contentType: selectedContentType,
           contentTypeInfo: { title: contentTypeInfo?.title, subtitle: contentTypeInfo?.subtitle },
+          workspace_owner_id: workspaceOwnerId,
         }
       });
 
@@ -126,7 +129,7 @@ const ContentStudio = () => {
 
       // Save to generated_content
       await supabase.from('generated_content').insert({
-        user_id: user.id,
+        user_id: workspaceOwnerId,
         testimonial_ids: selectedTestimonials,
         type: contentTypeInfo?.dbType as any,
         content: JSON.stringify(result.data),
