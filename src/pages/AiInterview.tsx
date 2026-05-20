@@ -71,7 +71,10 @@ export default function AiInterview() {
     setPhase("chat");
   };
 
-  const submitTestimonial = async (compiled: string) => {
+  const submitTestimonial = async (
+    compiled: string,
+    extras?: { pull_quote?: string | null; one_liner?: string | null },
+  ) => {
     setPhase("submitting");
     try {
       const { data, error } = await supabase.functions.invoke("submit-testimonial", {
@@ -83,6 +86,10 @@ export default function AiInterview() {
           content: compiled,
           type: "text",
           source: "ai_interview",
+          already_developed: true,
+          developed_content: compiled,
+          developed_pull_quote: extras?.pull_quote ?? undefined,
+          developed_one_liner: extras?.one_liner ?? undefined,
         },
       });
       if (error) throw error;
@@ -124,11 +131,17 @@ export default function AiInterview() {
         });
       }
 
-      const { data, error } = await supabase.functions.invoke("ai-interview", { body: { messages: apiMessages } });
+      const formContext = (form?.custom_questions as { ai_prompt?: string } | null)?.ai_prompt ?? undefined;
+      const { data, error } = await supabase.functions.invoke("ai-interview", {
+        body: { messages: apiMessages, form_context: formContext },
+      });
       if (error) throw error;
 
       if (data?.complete && data.testimonial) {
-        await submitTestimonial(data.testimonial as string);
+        await submitTestimonial(data.testimonial as string, {
+          pull_quote: (data as { pull_quote?: string | null }).pull_quote ?? null,
+          one_liner: (data as { one_liner?: string | null }).one_liner ?? null,
+        });
         return;
       }
 
