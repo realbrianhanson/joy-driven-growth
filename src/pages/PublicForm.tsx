@@ -101,7 +101,7 @@ export default function PublicForm() {
         body: {
           form_slug: slug,
           content: testimonialType === "text" ? content : content || undefined,
-          rating: form.require_rating || rating > 0 ? rating : undefined,
+          rating: rating >= 1 && rating <= 5 ? rating : undefined,
           author_name: authorName,
           author_email: authorEmail || undefined,
           author_title: authorTitle || undefined,
