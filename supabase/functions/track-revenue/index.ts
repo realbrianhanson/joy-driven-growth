@@ -43,6 +43,7 @@ serve(async (req) => {
       source = "manual",
       customer_email,
       metadata = {},
+      workspace_owner_id,
     } = body;
 
     if (typeof amount !== "number" || !(amount > 0)) {
@@ -54,12 +55,29 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
+    // Resolve and validate workspace owner
+    let ownerId = userId;
+    if (workspace_owner_id && workspace_owner_id !== userId) {
+      const { data: member } = await supabase
+        .from("team_members")
+        .select("owner_user_id")
+        .eq("owner_user_id", workspace_owner_id)
+        .eq("member_user_id", userId)
+        .maybeSingle();
+      if (!member) {
+        return new Response(JSON.stringify({ error: "Forbidden: not a team member of that workspace" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      ownerId = workspace_owner_id;
+    }
+
     if (testimonial_id) {
       const { data: t } = await supabase
         .from("testimonials")
         .select("id")
         .eq("id", testimonial_id)
-        .eq("user_id", userId)
+        .eq("user_id", ownerId)
         .maybeSingle();
       if (!t) {
         return new Response(JSON.stringify({ error: "Forbidden" }), {
@@ -73,7 +91,7 @@ serve(async (req) => {
         .from("widgets")
         .select("id")
         .eq("id", widget_id)
-        .eq("user_id", userId)
+        .eq("user_id", ownerId)
         .maybeSingle();
       if (!w) {
         return new Response(JSON.stringify({ error: "Forbidden" }), {
@@ -85,7 +103,7 @@ serve(async (req) => {
     const { data: revenueEvent, error: insertError } = await supabase
       .from("revenue_events")
       .insert({
-        user_id: userId,
+        user_id: ownerId,
         testimonial_id,
         widget_id,
         amount,
@@ -116,7 +134,7 @@ serve(async (req) => {
     }
 
     await supabase.from("activity_log").insert({
-      user_id: userId,
+      user_id: ownerId,
       action: "revenue_tracked",
       entity_type: testimonial_id ? "testimonial" : widget_id ? "widget" : "manual",
       entity_id: testimonial_id || widget_id,
