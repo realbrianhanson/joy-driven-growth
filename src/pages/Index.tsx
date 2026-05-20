@@ -10,7 +10,6 @@ import {
   TrendingUp,
   Sparkles,
   DollarSign,
-  Repeat,
   Quote,
   Play,
   CheckCircle2,
