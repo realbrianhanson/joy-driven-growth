@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useWorkspace } from "@/hooks/use-workspace";
 
 interface ChecklistItem {
   id: string;
@@ -27,59 +28,59 @@ interface ChecklistItem {
 }
 
 export function OnboardingChecklist() {
-  const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
 
   const { data: formCount = 0 } = useQuery({
-    queryKey: ["onboarding-forms", user?.id],
+    queryKey: ["onboarding-forms", workspaceOwnerId],
     queryFn: async () => {
-      if (!user) return 0;
+      if (!workspaceOwnerId) return 0;
       const { count } = await supabase
         .from("forms")
         .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id);
+        .eq("user_id", workspaceOwnerId);
       return count || 0;
     },
-    enabled: !!user,
+    enabled: !!workspaceOwnerId,
   });
 
   const { data: testimonialCount = 0 } = useQuery({
-    queryKey: ["onboarding-testimonials", user?.id],
+    queryKey: ["onboarding-testimonials", workspaceOwnerId],
     queryFn: async () => {
-      if (!user) return 0;
+      if (!workspaceOwnerId) return 0;
       const { count } = await supabase
         .from("testimonials")
         .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id);
+        .eq("user_id", workspaceOwnerId);
       return count || 0;
     },
-    enabled: !!user,
+    enabled: !!workspaceOwnerId,
   });
 
   const { data: widgetCount = 0 } = useQuery({
-    queryKey: ["onboarding-widgets", user?.id],
+    queryKey: ["onboarding-widgets", workspaceOwnerId],
     queryFn: async () => {
-      if (!user) return 0;
+      if (!workspaceOwnerId) return 0;
       const { count } = await supabase
         .from("widgets")
         .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id);
+        .eq("user_id", workspaceOwnerId);
       return count || 0;
     },
-    enabled: !!user,
+    enabled: !!workspaceOwnerId,
   });
 
   const { data: integrationCount = 0 } = useQuery({
-    queryKey: ["onboarding-integrations", user?.id],
+    queryKey: ["onboarding-integrations", workspaceOwnerId],
     queryFn: async () => {
-      if (!user) return 0;
+      if (!workspaceOwnerId) return 0;
       const { count } = await supabase
         .from("integrations")
         .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
+        .eq("user_id", workspaceOwnerId)
         .eq("is_connected", true);
       return count || 0;
     },
-    enabled: !!user,
+    enabled: !!workspaceOwnerId,
   });
 
   const items: ChecklistItem[] = useMemo(

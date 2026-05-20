@@ -17,42 +17,44 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useWorkspace } from "@/hooks/use-workspace";
 import { useDemoMode } from "@/contexts/DemoModeContext";
 import { MOCK_CAMPAIGNS } from "@/data/mock/campaigns";
 
 export default function Campaigns() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
   const { isDemoMode } = useDemoMode();
   const queryClient = useQueryClient();
 
   const { data: realCampaigns, isLoading } = useQuery({
-    queryKey: ["campaigns", user?.id],
+    queryKey: ["campaigns", workspaceOwnerId],
     queryFn: async () => {
-      if (!user) return [];
+      if (!workspaceOwnerId) return [];
       const { data, error } = await supabase
         .from("campaigns")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", workspaceOwnerId)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!user && !isDemoMode,
+    enabled: !!workspaceOwnerId && !isDemoMode,
   });
 
   useEffect(() => {
-    if (!user || isDemoMode) return;
+    if (!workspaceOwnerId || isDemoMode) return;
     const channel = supabase
       .channel("campaigns-changes")
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "campaigns", filter: `user_id=eq.${user.id}` },
-        () => queryClient.invalidateQueries({ queryKey: ["campaigns", user.id] })
+        { event: "UPDATE", schema: "public", table: "campaigns", filter: `user_id=eq.${workspaceOwnerId}` },
+        () => queryClient.invalidateQueries({ queryKey: ["campaigns", workspaceOwnerId] })
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user, isDemoMode, queryClient]);
+  }, [workspaceOwnerId, isDemoMode, queryClient]);
 
   const loading = isDemoMode ? false : isLoading;
   const campaigns = isDemoMode ? MOCK_CAMPAIGNS : (realCampaigns ?? []);

@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useWorkspace } from "@/hooks/use-workspace";
 import { toast } from "sonner";
 import { useDemoMode } from "@/contexts/DemoModeContext";
 import { MOCK_WIDGETS } from "@/data/mock/widgets";
@@ -71,23 +72,24 @@ const formatCurrency = (amount: number) => {
 
 const Widgets = () => {
   const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const { isDemoMode } = useDemoMode();
 
   const { data: realWidgets = [], isLoading: realLoading } = useQuery({
-    queryKey: ['widgets', user?.id],
+    queryKey: ['widgets', workspaceOwnerId],
     queryFn: async () => {
-      if (!user) return [];
+      if (!workspaceOwnerId) return [];
       const { data, error } = await supabase
         .from('widgets')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', workspaceOwnerId)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!user && !isDemoMode,
+    enabled: !!workspaceOwnerId && !isDemoMode,
   });
 
   const widgets: any[] = isDemoMode ? (MOCK_WIDGETS as any[]) : realWidgets;

@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useWorkspace } from "@/hooks/use-workspace";
 
 const colClassMap: Record<number, string> = {
   1: "grid-cols-1",
@@ -34,6 +35,7 @@ const WallBuilder = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
   const isNew = !id || id === 'new';
 
   const [wallName, setWallName] = useState('');
@@ -103,19 +105,19 @@ const WallBuilder = () => {
 
   // Fetch approved testimonials
   const { data: testimonials = [], isLoading: loadingTestimonials } = useQuery({
-    queryKey: ['approved-testimonials-wall', user?.id],
+    queryKey: ['approved-testimonials-wall', workspaceOwnerId],
     queryFn: async () => {
-      if (!user) return [];
+      if (!workspaceOwnerId) return [];
       const { data, error } = await supabase
         .from('testimonials')
         .select('id, author_name, author_company, content, rating')
-        .eq('user_id', user.id)
+        .eq('user_id', workspaceOwnerId)
         .eq('status', 'approved')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!user,
+    enabled: !!workspaceOwnerId,
   });
 
   const filteredTestimonials = testimonials.filter(t =>
@@ -132,8 +134,8 @@ const WallBuilder = () => {
   const copyLink = () => { navigator.clipboard.writeText(publicUrl); toast.success('Link copied!'); };
 
   const handleSave = async () => {
-    if (!user || !wallName.trim() || !slug.trim()) {
-      toast.error('Please fill in name and slug');
+    if (!workspaceOwnerId || !wallName.trim() || !slug.trim()) {
+      toast.error(!workspaceOwnerId ? 'Workspace not ready' : 'Please fill in name and slug');
       return;
     }
     if (slugTaken) {
@@ -143,7 +145,7 @@ const WallBuilder = () => {
     setIsSaving(true);
     try {
       const payload = {
-        user_id: user.id,
+        user_id: workspaceOwnerId,
         name: wallName,
         slug,
         header_title: headerTitle,

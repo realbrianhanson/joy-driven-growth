@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
+import { useWorkspace } from "./use-workspace";
 import { Database } from "@/integrations/supabase/types";
 
 type Form = Database["public"]["Tables"]["forms"]["Row"];
@@ -8,23 +9,23 @@ type FormInsert = Database["public"]["Tables"]["forms"]["Insert"];
 type FormUpdate = Database["public"]["Tables"]["forms"]["Update"];
 
 export const useForms = () => {
-  const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
 
   return useQuery({
-    queryKey: ["forms", user?.id],
+    queryKey: ["forms", workspaceOwnerId],
     queryFn: async () => {
-      if (!user) return [];
+      if (!workspaceOwnerId) return [];
 
       const { data, error } = await supabase
         .from("forms")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", workspaceOwnerId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data as Form[];
     },
-    enabled: !!user,
+    enabled: !!workspaceOwnerId,
   });
 };
 
@@ -65,15 +66,15 @@ export const useFormBySlug = (slug: string) => {
 
 export const useCreateForm = () => {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
 
   return useMutation({
     mutationFn: async (form: Omit<FormInsert, "user_id">) => {
-      if (!user) throw new Error("Not authenticated");
+      if (!workspaceOwnerId) throw new Error("Workspace not ready");
 
       const { data, error } = await supabase
         .from("forms")
-        .insert({ ...form, user_id: user.id })
+        .insert({ ...form, user_id: workspaceOwnerId })
         .select()
         .single();
 

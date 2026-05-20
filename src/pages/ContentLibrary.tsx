@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useWorkspace } from "@/hooks/use-workspace";
 
 const typeConfig: Record<string, { label: string; icon: any }> = {
   twitter_thread: { label: 'Twitter Thread', icon: Twitter },
@@ -34,23 +35,24 @@ const typeConfig: Record<string, { label: string; icon: any }> = {
 
 const ContentLibrary = () => {
   const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
   const { data: content = [], isLoading } = useQuery({
-    queryKey: ['generated-content', user?.id],
+    queryKey: ['generated-content', workspaceOwnerId],
     queryFn: async () => {
-      if (!user) return [];
+      if (!workspaceOwnerId) return [];
       const { data, error } = await supabase
         .from('generated_content')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', workspaceOwnerId)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!user,
+    enabled: !!workspaceOwnerId,
   });
 
   const deleteContent = useMutation({

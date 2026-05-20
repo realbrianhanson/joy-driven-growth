@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useForms } from "@/hooks/use-forms";
 import { useAuth } from "@/hooks/use-auth";
+import { useWorkspace } from "@/hooks/use-workspace";
 import { supabase } from "@/integrations/supabase/client";
 
 const steps = [
@@ -41,6 +42,7 @@ export default function CampaignBuilder() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
   const { data: forms } = useForms();
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -90,11 +92,11 @@ export default function CampaignBuilder() {
   };
 
   const saveCampaign = async (status: "draft" | "active" | "scheduled") => {
-    if (!user) return null;
+    if (!workspaceOwnerId) return null;
     const { data, error } = await supabase
       .from("campaigns")
       .insert({
-        user_id: user.id,
+        user_id: workspaceOwnerId,
         name: campaignName,
         form_id: selectedFormId || null,
         type: "sms" as const,
@@ -111,6 +113,10 @@ export default function CampaignBuilder() {
   };
 
   const handleSaveDraft = async () => {
+    if (!workspaceOwnerId) {
+      toast({ title: "Workspace not ready", variant: "destructive" });
+      return;
+    }
     setIsSaving(true);
     try {
       await saveCampaign("draft");
@@ -124,6 +130,10 @@ export default function CampaignBuilder() {
   };
 
   const handleSend = async () => {
+    if (!workspaceOwnerId) {
+      toast({ title: "Workspace not ready", variant: "destructive" });
+      return;
+    }
     setIsSending(true);
     try {
       const isScheduled = timing === "scheduled" && !!scheduledDate;
@@ -133,7 +143,7 @@ export default function CampaignBuilder() {
 
       const jobs = validRecipients.map((r) => ({
         campaign_id: campaign.id,
-        user_id: user!.id,
+        user_id: workspaceOwnerId,
         phone: r.phone,
         first_name: r.first_name || null,
         message: message

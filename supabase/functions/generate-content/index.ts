@@ -97,13 +97,36 @@ serve(async (req) => {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const callerId = userData.user.id;
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const { testimonials, contentType, contentTypeInfo }: ContentRequest = await req.json();
+    const body = await req.json();
+    const { testimonials, contentType, contentTypeInfo, workspace_owner_id } = body as ContentRequest & { workspace_owner_id?: string };
+
+    // Resolve and validate workspace owner
+    let workspaceOwnerId = callerId;
+    if (workspace_owner_id && workspace_owner_id !== callerId) {
+      const svc = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      const { data: member } = await svc
+        .from("team_members")
+        .select("owner_user_id")
+        .eq("owner_user_id", workspace_owner_id)
+        .eq("member_user_id", callerId)
+        .maybeSingle();
+      if (!member) {
+        return new Response(JSON.stringify({ error: "Forbidden: not a team member of that workspace" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      workspaceOwnerId = workspace_owner_id;
+    }
 
     if (!testimonials || testimonials.length === 0) {
       throw new Error('No testimonials provided');

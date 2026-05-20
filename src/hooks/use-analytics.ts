@@ -1,13 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
+import { useWorkspace } from "./use-workspace";
 import { Database } from "@/integrations/supabase/types";
 
 type RevenueEvent = Database["public"]["Tables"]["revenue_events"]["Row"];
 type ActivityLog = Database["public"]["Tables"]["activity_log"]["Row"];
 
 export const useRevenueEvents = (dateRange?: { start: Date; end: Date }) => {
-  const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
+  const user = workspaceOwnerId ? { id: workspaceOwnerId } : null;
 
   return useQuery({
     queryKey: ["revenue-events", user?.id, dateRange],
@@ -44,7 +46,8 @@ export const useTotalRevenue = (dateRange?: { start: Date; end: Date }) => {
 };
 
 export const useActivityLog = (limit = 20) => {
-  const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
+  const user = workspaceOwnerId ? { id: workspaceOwnerId } : null;
 
   return useQuery({
     queryKey: ["activity-log", user?.id, limit],
@@ -66,7 +69,8 @@ export const useActivityLog = (limit = 20) => {
 };
 
 export const useDashboardStats = () => {
-  const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
+  const user = workspaceOwnerId ? { id: workspaceOwnerId } : null;
 
   return useQuery({
     queryKey: ["dashboard-stats", user?.id],

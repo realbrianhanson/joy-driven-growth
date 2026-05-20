@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
+import { useWorkspace } from "./use-workspace";
 import { Database } from "@/integrations/supabase/types";
 
 type Testimonial = Database["public"]["Tables"]["testimonials"]["Row"];
@@ -13,17 +14,17 @@ export const useTestimonials = (filters?: {
   rating?: number;
   search?: string;
 }) => {
-  const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
 
   return useQuery({
-    queryKey: ["testimonials", user?.id, filters],
+    queryKey: ["testimonials", workspaceOwnerId, filters],
     queryFn: async () => {
-      if (!user) return [];
+      if (!workspaceOwnerId) return [];
 
       let query = supabase
         .from("testimonials")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", workspaceOwnerId)
         .order("created_at", { ascending: false });
 
       if (filters?.status) {
@@ -43,7 +44,7 @@ export const useTestimonials = (filters?: {
       if (error) throw error;
       return data as Testimonial[];
     },
-    enabled: !!user,
+    enabled: !!workspaceOwnerId,
   });
 };
 
@@ -66,15 +67,15 @@ export const useTestimonial = (id: string) => {
 
 export const useCreateTestimonial = () => {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
 
   return useMutation({
     mutationFn: async (testimonial: Omit<TestimonialInsert, "user_id">) => {
-      if (!user) throw new Error("Not authenticated");
+      if (!workspaceOwnerId) throw new Error("Workspace not ready");
 
       const { data, error } = await supabase
         .from("testimonials")
-        .insert({ ...testimonial, user_id: user.id })
+        .insert({ ...testimonial, user_id: workspaceOwnerId })
         .select()
         .single();
 
