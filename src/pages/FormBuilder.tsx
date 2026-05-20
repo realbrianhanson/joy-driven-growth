@@ -717,6 +717,28 @@ export default function FormBuilder() {
                         <Label>Placeholder</Label>
                         <Input value={q.placeholder || ""} onChange={(e) => setQuestions(questions.map((question) => question.id === q.id ? { ...question, placeholder: e.target.value } : question))} placeholder="Enter placeholder text..." className="mt-1" />
                       </div>
+                      <div>
+                        <Label>Help text</Label>
+                        <Textarea
+                          value={q.helpText || ""}
+                          onChange={(e) => setQuestions(questions.map((question) => question.id === q.id ? { ...question, helpText: e.target.value } : question))}
+                          placeholder="Coaching text shown under the question to encourage specific, honest answers..."
+                          rows={2}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label>Purpose</Label>
+                        <select
+                          className="w-full mt-1 p-2 rounded-lg border border-border bg-card text-sm"
+                          value={q.purpose ?? "open"}
+                          onChange={(e) => setQuestions(questions.map((question) => question.id === q.id ? { ...question, purpose: e.target.value as QuestionPurpose } : question))}
+                        >
+                          {(Object.keys(PURPOSE_LABELS) as QuestionPurpose[]).map((p) => (
+                            <option key={p} value={p}>{PURPOSE_LABELS[p]}</option>
+                          ))}
+                        </select>
+                      </div>
                       <div className="flex items-center justify-between">
                         <Label>Required</Label>
                         <Switch checked={q.required} onCheckedChange={(checked) => setQuestions(questions.map((question) => question.id === q.id ? { ...question, required: checked } : question))} />
