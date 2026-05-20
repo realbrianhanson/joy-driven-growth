@@ -338,29 +338,37 @@ export default function FormBuilder() {
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b border-border bg-card sticky top-0 z-50">
-        <div className="max-w-[1800px] mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard/forms")}>
-              <ArrowLeft className="w-4 h-4 mr-1" /> Back
+        <div className="max-w-[1800px] mx-auto px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/dashboard/forms")}
+              className="h-8 px-2 text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="w-4 h-4 mr-1" /> Forms
             </Button>
-            <div>
-              <Input
-                value={settings.name}
-                onChange={(e) => setSettings({ ...settings, name: e.target.value })}
-                className="text-lg font-semibold border-0 bg-transparent p-0 h-auto focus-visible:ring-0"
+            <span className="text-border" aria-hidden>/</span>
+            <Input
+              value={settings.name}
+              onChange={(e) => setSettings({ ...settings, name: e.target.value })}
+              className="text-[15px] font-semibold border-0 bg-transparent p-0 h-auto focus-visible:ring-0 max-w-[320px]"
+            />
+            <span className="inline-flex items-center gap-1.5 ml-2 text-[10px] uppercase tracking-wider font-medium text-muted-foreground">
+              <span
+                className={`inline-block w-1.5 h-1.5 rounded-full ${settings.status ? "bg-success" : "bg-muted-foreground/40"}`}
+                aria-hidden
               />
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Badge variant={settings.status ? "default" : "secondary"} className={settings.status ? "bg-success text-white" : ""}>
               {settings.status ? "Active" : "Inactive"}
-            </Badge>
-            <Button variant="outline" onClick={() => window.open(`/collect/${settings.slug}`, "_blank")}>
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="h-8" onClick={() => window.open(`/collect/${settings.slug}`, "_blank")}>
               Preview
             </Button>
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Save Changes
+            <Button size="sm" className="h-8" onClick={handleSave} disabled={isSaving}>
+              {isSaving && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+              Save
             </Button>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Copy, ExternalLink, MoreHorizontal, Pencil, Eye, Trash2, FileText } from "lucide-react";
+import { Plus, Copy, ExternalLink, MoreHorizontal, Pencil, Trash2, FileText, Sparkles, Video, Mic, Type } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +58,8 @@ export default function Forms() {
     ? MOCK_FORMS.map(mapForm)
     : (realForms ?? []).map(mapForm);
 
+  const activeCount = forms.filter((f) => f.status === "active").length;
+
   const formatTimeAgo = (dateString?: string) => {
     if (!dateString) return "No responses yet";
     const date = new Date(dateString);
@@ -96,21 +98,23 @@ export default function Forms() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-6 py-10">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-end justify-between mb-8">
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")} className="p-0 h-auto">
-                <ArrowLeft className="w-5 h-5 mr-1" />
-                Back
-              </Button>
-            </div>
-            <h1 className="text-3xl font-bold text-foreground">Collection Forms</h1>
-            <p className="text-muted-foreground">Create ways to collect testimonials</p>
+            <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Collection Forms</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              <span className="tabular-nums">{forms.length}</span> total
+              {activeCount > 0 && (
+                <>
+                  <span className="mx-1.5 text-border">·</span>
+                  <span className="tabular-nums">{activeCount}</span> active
+                </>
+              )}
+            </p>
           </div>
-          <Button onClick={() => navigate("/dashboard/forms/new/edit")}>
-            <Plus className="w-4 h-4 mr-2" />
+          <Button size="sm" onClick={() => navigate("/dashboard/forms/new/edit")}>
+            <Plus className="w-4 h-4 mr-1.5" />
             New Form
           </Button>
         </div>
@@ -134,41 +138,61 @@ export default function Forms() {
           </div>
         ) : forms.length === 0 ? (
           /* Empty state */
-          <div className="text-center py-20">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-muted mb-4">
-              <FileText className="w-8 h-8 text-muted-foreground" />
+          <div className="text-center py-24 border border-dashed border-border rounded-xl">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-light mb-4">
+              <FileText className="w-5 h-5 text-primary" />
             </div>
-            <h3 className="text-xl font-semibold text-foreground mb-2">Create your first collection form</h3>
-            <p className="text-muted-foreground max-w-sm mx-auto mb-6">
+            <h3 className="text-base font-semibold text-foreground mb-1.5">Create your first collection form</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-5">
               Design a custom form to start gathering testimonials from your clients.
             </p>
-            <Button onClick={() => navigate("/dashboard/forms/new/edit")}>
-              <Plus className="w-4 h-4 mr-2" />
+            <Button size="sm" onClick={() => navigate("/dashboard/forms/new/edit")}>
+              <Plus className="w-4 h-4 mr-1.5" />
               Create Form
             </Button>
           </div>
         ) : (
           /* Forms Grid */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {forms.map((form, index) => (
               <Card
                 key={form.id}
-                className="bg-card border hover:border-border-hover rounded-xl transition-all duration-150 animate-fade-in-up"
+                className="bg-card border border-border hover:border-border-hover rounded-xl transition-colors duration-150 animate-fade-in-up shadow-none"
                 style={{ animationDelay: `${index * 50}ms` }}
               >
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-foreground truncate">{form.name}</h3>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                        {form.types.includes("text") && <span>Text</span>}
-                        {form.types.includes("video") && <span>Video</span>}
-                        {form.types.includes("audio") && <span>Audio</span>}
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span
+                          className={`inline-block w-1.5 h-1.5 rounded-full ${form.status === "active" ? "bg-success" : "bg-muted-foreground/40"}`}
+                          aria-hidden
+                        />
+                        <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">
+                          {form.status === "active" ? "Active" : "Inactive"}
+                        </span>
+                        {form.aiInterview && (
+                          <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-medium text-primary">
+                            <Sparkles className="w-3 h-3" /> AI
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-semibold text-foreground truncate text-[15px]">{form.name}</h3>
+                      <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
+                        {form.types.includes("text") && (
+                          <span className="inline-flex items-center gap-1"><Type className="w-3 h-3" /> Text</span>
+                        )}
+                        {form.types.includes("video") && (
+                          <span className="inline-flex items-center gap-1"><Video className="w-3 h-3" /> Video</span>
+                        )}
+                        {form.types.includes("audio") && (
+                          <span className="inline-flex items-center gap-1"><Mic className="w-3 h-3" /> Audio</span>
+                        )}
                       </div>
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 -mr-1 -mt-1 text-muted-foreground hover:text-foreground">
                           <MoreHorizontal className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -186,32 +210,23 @@ export default function Forms() {
                     </DropdownMenu>
                   </div>
 
-                  <div className="flex items-center gap-2 mb-4">
-                    <Badge variant={form.status === "active" ? "default" : "secondary"} className={form.status === "active" ? "bg-success text-white" : ""}>
-                      {form.status === "active" ? "Active" : "Inactive"}
-                    </Badge>
-                    {form.aiInterview && (
-                      <Badge variant="outline" className="text-primary border-primary/30">AI Interview</Badge>
-                    )}
-                  </div>
-
-                  <div className="space-y-2 mb-4">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Responses</span>
-                      <span className="font-medium text-foreground">{form.responses}</span>
+                  <div className="flex items-baseline justify-between pt-3 mt-3 border-t border-border">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Responses</div>
+                      <div className="text-xl font-semibold text-foreground tabular-nums mt-0.5">{form.responses}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Last</div>
+                      <div className="text-xs text-foreground tabular-nums mt-1">{formatTimeAgo(form.lastResponse)}</div>
                     </div>
                   </div>
 
-                  <div className="text-xs text-muted-foreground mb-4">
-                    Last response: {formatTimeAgo(form.lastResponse)}
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1" onClick={() => navigate(`/dashboard/forms/${form.id}/edit`)}>
-                      <Pencil className="w-3 h-3 mr-1" /> Edit
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-border">
+                    <Button variant="outline" size="sm" className="flex-1 h-8" onClick={() => navigate(`/dashboard/forms/${form.id}/edit`)}>
+                      <Pencil className="w-3 h-3 mr-1.5" /> Edit
                     </Button>
-                    <Button variant="outline" size="sm" className="flex-1" onClick={() => copyLink(form.slug)}>
-                      <ExternalLink className="w-3 h-3 mr-1" /> Share
+                    <Button variant="outline" size="sm" className="flex-1 h-8" onClick={() => copyLink(form.slug)}>
+                      <ExternalLink className="w-3 h-3 mr-1.5" /> Share
                     </Button>
                   </div>
                 </CardContent>
@@ -220,15 +235,15 @@ export default function Forms() {
 
             {/* Create New Card */}
             <Card
-              className="border-2 border-dashed border-border bg-card/50 hover:border-primary/50 hover:bg-primary/5 cursor-pointer transition-all duration-150 rounded-xl"
+              className="border border-dashed border-border bg-transparent hover:border-primary/50 hover:bg-primary-light/40 cursor-pointer transition-colors duration-150 rounded-xl shadow-none"
               onClick={() => navigate("/dashboard/forms/new/edit")}
             >
-              <CardContent className="p-6 flex flex-col items-center justify-center h-full min-h-[280px]">
-                <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center mb-4">
-                  <Plus className="w-7 h-7 text-primary-foreground" />
+              <CardContent className="p-5 flex flex-col items-center justify-center h-full min-h-[240px]">
+                <div className="w-10 h-10 rounded-lg bg-primary-light flex items-center justify-center mb-3">
+                  <Plus className="w-5 h-5 text-primary" />
                 </div>
-                <h3 className="font-semibold text-foreground mb-1">Create New Form</h3>
-                <p className="text-sm text-muted-foreground text-center">Design a custom form to collect testimonials</p>
+                <h3 className="font-semibold text-foreground text-[15px] mb-1">Create New Form</h3>
+                <p className="text-xs text-muted-foreground text-center">Design a custom form to collect testimonials</p>
               </CardContent>
             </Card>
           </div>
