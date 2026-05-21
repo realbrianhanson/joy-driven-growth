@@ -11,6 +11,7 @@ interface WallTestimonial {
   author_title: string | null;
   author_company: string | null;
   author_avatar: string | null;
+  display_preference: "full" | "first_initial" | "anonymous" | null;
   content: string | null;
   rating: number | null;
   type: "text" | "video" | "audio";
