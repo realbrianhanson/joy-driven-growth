@@ -92,6 +92,7 @@ export default function FormBuilder() {
         consentEnabled: persisted.consent_enabled ?? true,
         consentText: persisted.consent_text ?? DEFAULT_CONSENT_TEMPLATE,
         nameDisplayEnabled: persisted.name_display_enabled ?? true,
+        googlePlaceId: persisted.google_place_id ?? "",
       });
       if (cq?.questions && Array.isArray(cq.questions)) {
         setQuestions(cq.questions);
@@ -142,6 +143,7 @@ export default function FormBuilder() {
           consent_enabled: settings.consentEnabled,
           consent_text: settings.consentText,
           name_display_enabled: settings.nameDisplayEnabled,
+          google_place_id: settings.googlePlaceId,
         },
       })),
     };

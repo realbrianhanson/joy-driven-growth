@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { Star, ArrowRight, ArrowLeft, Check, Copy, Loader2, AlertCircle, MessageSquare, Video as VideoIcon, Mic } from "lucide-react";
+import { Star, ArrowRight, ArrowLeft, Check, Copy, Loader2, AlertCircle, MessageSquare, Video as VideoIcon, Mic, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -57,6 +57,7 @@ export default function PublicForm() {
   const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedReview, setCopiedReview] = useState(false);
   const [consentChecked, setConsentChecked] = useState(false);
   const [displayPreference, setDisplayPreference] = useState<DisplayPreference>("full");
 
@@ -86,6 +87,11 @@ export default function PublicForm() {
       consentText: s.consent_text ?? DEFAULT_CONSENT_TEMPLATE,
       nameDisplayEnabled: s.name_display_enabled ?? true,
     };
+  }, [form]);
+
+  const googlePlaceId = useMemo(() => {
+    const s = (form?.custom_questions as { settings?: { google_place_id?: string } } | null)?.settings ?? {};
+    return (s.google_place_id ?? "").trim();
   }, [form]);
 
   const renderedConsentText = useMemo(
@@ -170,6 +176,14 @@ export default function PublicForm() {
       navigator.clipboard.writeText(form.incentive_value);
       setCopiedCode(true);
       setTimeout(() => setCopiedCode(false), 2000);
+    }
+  };
+
+  const copyReview = () => {
+    if (content) {
+      navigator.clipboard.writeText(content);
+      setCopiedReview(true);
+      setTimeout(() => setCopiedReview(false), 2000);
     }
   };
 
