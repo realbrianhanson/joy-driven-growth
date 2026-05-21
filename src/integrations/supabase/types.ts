@@ -405,6 +405,30 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limits: {
+        Row: {
+          count: number
+          id: string
+          key: string
+          updated_at: string
+          window_started_at: string
+        }
+        Insert: {
+          count?: number
+          id?: string
+          key: string
+          updated_at?: string
+          window_started_at: string
+        }
+        Update: {
+          count?: number
+          id?: string
+          key?: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
       revenue_events: {
         Row: {
           amount: number
@@ -850,10 +874,47 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      integrations_safe: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          is_connected: boolean | null
+          last_synced_at: string | null
+          provider: string | null
+          settings: Json | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          is_connected?: boolean | null
+          last_synced_at?: string | null
+          provider?: string | null
+          settings?: Json | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          is_connected?: boolean | null
+          last_synced_at?: string | null
+          provider?: string | null
+          settings?: Json | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_team_invite: { Args: { p_token: string }; Returns: Json }
+      can_write_for: { Args: { p_owner_id: string }; Returns: boolean }
+      check_rate_limit: {
+        Args: { p_key: string; p_max: number; p_window_seconds: number }
+        Returns: boolean
+      }
       claim_pending_jobs: {
         Args: { p_limit?: number }
         Returns: {

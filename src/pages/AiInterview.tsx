@@ -133,7 +133,7 @@ export default function AiInterview() {
 
       const formContext = (form?.custom_questions as { ai_prompt?: string } | null)?.ai_prompt ?? undefined;
       const { data, error } = await supabase.functions.invoke("ai-interview", {
-        body: { messages: apiMessages, form_context: formContext },
+        body: { messages: apiMessages, form_context: formContext, form_slug: slug },
       });
       if (error) throw error;
 

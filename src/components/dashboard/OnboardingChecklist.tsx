@@ -74,7 +74,7 @@ export function OnboardingChecklist() {
     queryFn: async () => {
       if (!workspaceOwnerId) return 0;
       const { count } = await supabase
-        .from("integrations")
+        .from("integrations_safe" as never)
         .select("id", { count: "exact", head: true })
         .eq("user_id", workspaceOwnerId)
         .eq("is_connected", true);
