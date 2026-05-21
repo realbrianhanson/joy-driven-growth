@@ -14,8 +14,10 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DEFAULT_CONSENT_TEMPLATE, DISPLAY_PREFERENCE_OPTIONS, renderConsentText, type DisplayPreference } from "@/lib/consent";
 
-type FormStep = "welcome" | "info" | "type" | "rating" | "content" | "custom" | "consent" | "uploading" | "thankyou";
+type FormStep = "welcome" | "testimonial" | "custom" | "info" | "consent" | "uploading" | "thankyou";
 type TestimonialType = "text" | "video" | "audio";
+
+const MIN_TEXT_LENGTH = 15;
 
 interface CustomQuestion {
   id: string;
@@ -42,6 +44,7 @@ export default function PublicForm() {
   });
 
   const [step, setStep] = useState<FormStep>("welcome");
+  const [lastStepBeforeSubmit, setLastStepBeforeSubmit] = useState<FormStep>("testimonial");
   const [testimonialType, setTestimonialType] = useState<TestimonialType>("text");
   const [rating, setRating] = useState<number>(0);
   const [content, setContent] = useState("");
@@ -120,6 +123,7 @@ export default function PublicForm() {
 
   const handleSubmit = async () => {
     if (!form || !slug) return;
+    setLastStepBeforeSubmit(step);
     setIsSubmitting(true);
     setStep("uploading");
     try {
@@ -155,7 +159,7 @@ export default function PublicForm() {
     } catch (err) {
       console.error("Submit error:", err);
       toast.error(err instanceof Error ? err.message : "Failed to submit testimonial. Please try again.");
-      setStep("content");
+      setStep(lastStepBeforeSubmit);
     } finally {
       setIsSubmitting(false);
     }
@@ -196,28 +200,41 @@ export default function PublicForm() {
     );
   }
 
+  const stepOrder = useMemo<FormStep[]>(() => {
+    const o: FormStep[] = ["testimonial"];
+    if (customQuestions.length > 0) o.push("custom");
+    o.push("info");
+    if (needsConsentStep) o.push("consent");
+    return o;
+  }, [customQuestions.length, needsConsentStep]);
+
   const goNext = () => {
-    if (step === "welcome") setStep("info");
-    else if (step === "info") setStep(availableTypes.length > 1 ? "type" : "rating");
-    else if (step === "type") setStep("rating");
-    else if (step === "rating") setStep("content");
-    else if (step === "content") setStep(customQuestions.length > 0 ? "custom" : (needsConsentStep ? "consent" : "uploading"));
-    else if (step === "custom") setStep(needsConsentStep ? "consent" : "uploading");
+    if (step === "welcome") {
+      setStep(stepOrder[0]);
+      return;
+    }
+    const idx = stepOrder.indexOf(step);
+    if (idx >= 0 && idx < stepOrder.length - 1) setStep(stepOrder[idx + 1]);
   };
 
   const goBack = () => {
-    if (step === "consent") setStep(customQuestions.length > 0 ? "custom" : "content");
-    else if (step === "custom") setStep("content");
-    else if (step === "content") setStep("rating");
-    else if (step === "rating") setStep(availableTypes.length > 1 ? "type" : "info");
-    else if (step === "type") setStep("info");
-    else if (step === "info") setStep("welcome");
+    const idx = stepOrder.indexOf(step);
+    if (idx <= 0) setStep("welcome");
+    else setStep(stepOrder[idx - 1]);
   };
 
   const stepIndex = (() => {
-    const order = ["info", availableTypes.length > 1 ? "type" : null, "rating", "content", customQuestions.length > 0 ? "custom" : null, needsConsentStep ? "consent" : null].filter(Boolean) as FormStep[];
-    return { current: Math.max(1, order.indexOf(step) + 1), total: order.length };
+    const idx = stepOrder.indexOf(step);
+    return { current: Math.max(1, idx + 1), total: stepOrder.length };
   })();
+
+  const isLastStep = step === stepOrder[stepOrder.length - 1];
+
+  const textTooShort = testimonialType === "text" && content.trim().length < MIN_TEXT_LENGTH;
+  const testimonialIncomplete =
+    (testimonialType === "text" && textTooShort) ||
+    (testimonialType !== "text" && !mediaBlob) ||
+    (!!form.require_rating && rating === 0);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -247,75 +264,48 @@ export default function PublicForm() {
           </div>
         )}
 
-        {step === "info" && (
-          <StepShell index={stepIndex.current} total={stepIndex.total} brandColor={brandColor}>
-            <h3 className="text-lg font-semibold text-foreground mb-4">Tell us about yourself</h3>
-            <div className="space-y-3">
-              <LabeledInput required label="Your name" value={authorName} onChange={setAuthorName} placeholder="Jane Smith" />
-              <LabeledInput label="Email" value={authorEmail} onChange={setAuthorEmail} placeholder="jane@company.com" type="email" />
-              <LabeledInput label="Title" value={authorTitle} onChange={setAuthorTitle} placeholder="CEO" />
-              <LabeledInput label="Company" value={authorCompany} onChange={setAuthorCompany} placeholder="Acme Inc" />
-            </div>
-            <div className="flex justify-between pt-6">
-              <Button variant="ghost" onClick={goBack}><ArrowLeft className="w-4 h-4 mr-2" />Back</Button>
-              <Button onClick={goNext} disabled={!authorName.trim()} style={{ backgroundColor: brandColor }}>
-                Next <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
-          </StepShell>
-        )}
-
-        {step === "type" && (
-          <StepShell index={stepIndex.current} total={stepIndex.total} brandColor={brandColor}>
-            <h3 className="text-lg font-semibold text-foreground mb-1">How would you like to share?</h3>
-            <p className="text-sm text-muted-foreground mb-4">Pick the format that's easiest for you.</p>
-            <div className="grid grid-cols-1 gap-3">
-              {availableTypes.includes("text") && (
-                <TypeOption icon={MessageSquare} label="Write it" desc="Type out your testimonial" selected={testimonialType === "text"} onSelect={() => setTestimonialType("text")} brandColor={brandColor} />
-              )}
-              {availableTypes.includes("video") && (
-                <TypeOption icon={VideoIcon} label="Record a video" desc="Up to 60 seconds" selected={testimonialType === "video"} onSelect={() => setTestimonialType("video")} brandColor={brandColor} />
-              )}
-              {availableTypes.includes("audio") && (
-                <TypeOption icon={Mic} label="Record audio" desc="Up to 60 seconds" selected={testimonialType === "audio"} onSelect={() => setTestimonialType("audio")} brandColor={brandColor} />
-              )}
-            </div>
-            <div className="flex justify-between pt-6">
-              <Button variant="ghost" onClick={goBack}><ArrowLeft className="w-4 h-4 mr-2" />Back</Button>
-              <Button onClick={goNext} style={{ backgroundColor: brandColor }}>Next <ArrowRight className="w-4 h-4 ml-2" /></Button>
-            </div>
-          </StepShell>
-        )}
-
-        {step === "rating" && (
-          <StepShell index={stepIndex.current} total={stepIndex.total} brandColor={brandColor}>
-            <h3 className="text-lg font-semibold text-foreground mb-1">
-              How would you rate your experience?
-              {form.require_rating && <span className="text-destructive ml-1">*</span>}
-            </h3>
-            <div className="flex justify-center gap-2 my-6">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button key={star} onClick={() => setRating(star)} className="group" aria-label={`${star} star${star !== 1 ? "s" : ""}`}>
-                  <Star className={`w-10 h-10 transition-all duration-150 group-hover:scale-110 ${rating >= star ? "fill-amber-500 text-amber-500" : "text-muted-foreground/40 group-hover:text-amber-400"}`} />
-                </button>
-              ))}
-            </div>
-            <div className="flex justify-between pt-4">
-              <Button variant="ghost" onClick={goBack}><ArrowLeft className="w-4 h-4 mr-2" />Back</Button>
-              <Button onClick={goNext} disabled={!!form.require_rating && rating === 0} style={{ backgroundColor: brandColor }}>
-                Next <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
-          </StepShell>
-        )}
-
-        {step === "content" && (
+        {step === "testimonial" && (
           <StepShell index={stepIndex.current} total={stepIndex.total} brandColor={brandColor}>
             <h3 className="text-lg font-semibold text-foreground mb-1">Share your experience</h3>
             <p className="text-sm text-muted-foreground mb-4">What did you enjoy most? What results did you achieve?</p>
 
+            {availableTypes.length > 1 && (
+              <div className="grid grid-cols-1 gap-2 mb-5">
+                {availableTypes.includes("text") && (
+                  <TypeOption icon={MessageSquare} label="Write it" desc="Type out your testimonial" selected={testimonialType === "text"} onSelect={() => setTestimonialType("text")} brandColor={brandColor} />
+                )}
+                {availableTypes.includes("video") && (
+                  <TypeOption icon={VideoIcon} label="Record a video" desc={`Up to ${videoMaxLength} seconds`} selected={testimonialType === "video"} onSelect={() => setTestimonialType("video")} brandColor={brandColor} />
+                )}
+                {availableTypes.includes("audio") && (
+                  <TypeOption icon={Mic} label="Record audio" desc={`Up to ${videoMaxLength} seconds`} selected={testimonialType === "audio"} onSelect={() => setTestimonialType("audio")} brandColor={brandColor} />
+                )}
+              </div>
+            )}
+
+            <div className="mb-5">
+              <label className="text-sm font-medium text-foreground block mb-2 text-center">
+                How would you rate your experience?
+                {form.require_rating && <span className="text-destructive ml-1">*</span>}
+              </label>
+              <div className="flex justify-center gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button key={star} onClick={() => setRating(star)} className="group" aria-label={`${star} star${star !== 1 ? "s" : ""}`}>
+                    <Star className={`w-8 h-8 transition-all duration-150 group-hover:scale-110 ${rating >= star ? "fill-amber-500 text-amber-500" : "text-muted-foreground/40 group-hover:text-amber-400"}`} />
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {testimonialType === "text" && (
-              <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Tell us about your experience..." rows={5} className="resize-none" />
+              <>
+                <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Tell us about your experience..." rows={5} className="resize-none" />
+                {textTooShort && content.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {MIN_TEXT_LENGTH - content.trim().length} more character{MIN_TEXT_LENGTH - content.trim().length === 1 ? "" : "s"} needed
+                  </p>
+                )}
+              </>
             )}
 
             {testimonialType === "video" && (
@@ -340,16 +330,30 @@ export default function PublicForm() {
 
             <div className="flex justify-between pt-6">
               <Button variant="ghost" onClick={goBack}><ArrowLeft className="w-4 h-4 mr-2" />Back</Button>
+              <Button onClick={goNext} disabled={testimonialIncomplete} style={{ backgroundColor: brandColor }}>
+                Next <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          </StepShell>
+        )}
+
+        {step === "info" && (
+          <StepShell index={stepIndex.current} total={stepIndex.total} brandColor={brandColor}>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Tell us about yourself</h3>
+            <div className="space-y-3">
+              <LabeledInput required label="Your name" value={authorName} onChange={setAuthorName} placeholder="Jane Smith" />
+              <LabeledInput optional label="Email" value={authorEmail} onChange={setAuthorEmail} placeholder="jane@company.com" type="email" />
+              <LabeledInput optional label="Title" value={authorTitle} onChange={setAuthorTitle} placeholder="CEO" />
+              <LabeledInput optional label="Company" value={authorCompany} onChange={setAuthorCompany} placeholder="Acme Inc" />
+            </div>
+            <div className="flex justify-between pt-6">
+              <Button variant="ghost" onClick={goBack}><ArrowLeft className="w-4 h-4 mr-2" />Back</Button>
               <Button
-                onClick={(customQuestions.length > 0 || needsConsentStep) ? goNext : handleSubmit}
-                disabled={
-                  isSubmitting ||
-                  (testimonialType === "text" && !content.trim()) ||
-                  (testimonialType !== "text" && !mediaBlob)
-                }
+                onClick={isLastStep ? handleSubmit : goNext}
+                disabled={isSubmitting || !authorName.trim()}
                 style={{ backgroundColor: brandColor }}
               >
-                {(customQuestions.length > 0 || needsConsentStep) ? <>Next <ArrowRight className="w-4 h-4 ml-2" /></> : <>Submit</>}
+                {isLastStep ? (isSubmitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting...</> : "Submit") : <>Next <ArrowRight className="w-4 h-4 ml-2" /></>}
               </Button>
             </div>
           </StepShell>
@@ -389,11 +393,11 @@ export default function PublicForm() {
             <div className="flex justify-between pt-6">
               <Button variant="ghost" onClick={goBack}><ArrowLeft className="w-4 h-4 mr-2" />Back</Button>
               <Button
-                onClick={needsConsentStep ? goNext : handleSubmit}
+                onClick={goNext}
                 disabled={isSubmitting}
                 style={{ backgroundColor: brandColor }}
               >
-                {needsConsentStep ? <>Next <ArrowRight className="w-4 h-4 ml-2" /></> : (isSubmitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting...</> : "Submit")}
+                Next <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
           </StepShell>
