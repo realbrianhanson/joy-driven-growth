@@ -976,6 +976,10 @@ export type Database = {
         Returns: undefined
       }
       is_team_member_of: { Args: { p_owner_id: string }; Returns: boolean }
+      mask_author_name: {
+        Args: { p_name: string; p_preference: string }
+        Returns: string
+      }
       promote_scheduled_campaigns: { Args: never; Returns: number }
       refresh_campaign_counts: {
         Args: { p_campaign_id: string }
