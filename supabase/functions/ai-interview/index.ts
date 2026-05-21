@@ -1,9 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+function getClientIp(req: Request): string {
+  const xff = req.headers.get("x-forwarded-for") || "";
+  const ip = xff.split(",")[0]?.trim();
+  return ip || "unknown";
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -11,7 +18,47 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, form_context } = await req.json();
+    const { messages, form_context, form_slug } = await req.json();
+
+    if (!form_slug || typeof form_slug !== "string") {
+      return new Response(
+        JSON.stringify({ error: "form_slug required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
+    // Verify the form exists and is published.
+    const { data: form, error: formErr } = await supabase
+      .from("forms")
+      .select("id, is_published")
+      .eq("slug", form_slug)
+      .maybeSingle();
+    if (formErr || !form || !form.is_published) {
+      return new Response(
+        JSON.stringify({ error: "form_not_found_or_unpublished" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // IP-based rate limit: 10 requests / 60s.
+    const ip = getClientIp(req);
+    const { data: allowed, error: rlErr } = await supabase.rpc("check_rate_limit", {
+      p_key: `ai-interview:${ip}`,
+      p_max: 10,
+      p_window_seconds: 60,
+    });
+    if (rlErr) console.error("rate_limit error", rlErr);
+    if (allowed === false) {
+      return new Response(
+        JSON.stringify({ error: "rate_limited" }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (!Array.isArray(messages) || messages.length > 30) {
       return new Response(
