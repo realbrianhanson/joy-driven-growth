@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { Star, ArrowRight, ArrowLeft, Check, Copy, Loader2, AlertCircle, MessageSquare, Video as VideoIcon, Mic } from "lucide-react";
+import { Star, ArrowRight, ArrowLeft, Check, Copy, Loader2, AlertCircle, MessageSquare, Video as VideoIcon, Mic, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -57,6 +57,7 @@ export default function PublicForm() {
   const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedReview, setCopiedReview] = useState(false);
   const [consentChecked, setConsentChecked] = useState(false);
   const [displayPreference, setDisplayPreference] = useState<DisplayPreference>("full");
 
@@ -86,6 +87,11 @@ export default function PublicForm() {
       consentText: s.consent_text ?? DEFAULT_CONSENT_TEMPLATE,
       nameDisplayEnabled: s.name_display_enabled ?? true,
     };
+  }, [form]);
+
+  const googlePlaceId = useMemo(() => {
+    const s = (form?.custom_questions as { settings?: { google_place_id?: string } } | null)?.settings ?? {};
+    return (s.google_place_id ?? "").trim();
   }, [form]);
 
   const renderedConsentText = useMemo(
@@ -170,6 +176,14 @@ export default function PublicForm() {
       navigator.clipboard.writeText(form.incentive_value);
       setCopiedCode(true);
       setTimeout(() => setCopiedCode(false), 2000);
+    }
+  };
+
+  const copyReview = () => {
+    if (content) {
+      navigator.clipboard.writeText(content);
+      setCopiedReview(true);
+      setTimeout(() => setCopiedReview(false), 2000);
     }
   };
 
@@ -483,6 +497,49 @@ export default function PublicForm() {
                     {copiedCode ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   </Button>
                 </div>
+              </div>
+            )}
+
+            {googlePlaceId && (
+              <div className="rounded-lg p-5 mb-5 border border-border bg-muted/30 text-left">
+                <h3 className="text-sm font-semibold text-foreground mb-1 text-center">Mind sharing this on Google?</h3>
+                <p className="text-xs text-muted-foreground mb-4 text-center">
+                  It takes 30 seconds and helps more people discover us.
+                </p>
+
+                {testimonialType === "text" && content && (
+                  <div className="mb-4">
+                    <div className="rounded-lg border border-border bg-card p-3 text-sm text-foreground whitespace-pre-wrap max-h-40 overflow-y-auto">
+                      {content}
+                    </div>
+                    <div className="flex justify-center mt-2">
+                      <Button variant="outline" size="sm" onClick={copyReview}>
+                        {copiedReview ? (
+                          <><Check className="w-4 h-4 mr-2" />Copied</>
+                        ) : (
+                          <><Copy className="w-4 h-4 mr-2" />Copy review</>
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-2 text-center">
+                      Copy your words, then paste them into the Google review box.
+                    </p>
+                  </div>
+                )}
+
+                <Button
+                  className="w-full"
+                  style={{ backgroundColor: brandColor }}
+                  onClick={() =>
+                    window.open(
+                      `https://search.google.com/local/writereview?placeid=${encodeURIComponent(googlePlaceId)}`,
+                      "_blank",
+                      "noopener,noreferrer",
+                    )
+                  }
+                >
+                  Open Google Reviews <ExternalLink className="w-4 h-4 ml-2" />
+                </Button>
               </div>
             )}
 

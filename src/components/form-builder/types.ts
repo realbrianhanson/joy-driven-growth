@@ -42,6 +42,7 @@ export interface FormSettings {
   consentEnabled: boolean;
   consentText: string;
   nameDisplayEnabled: boolean;
+  googlePlaceId: string;
 }
 
 export const defaultQuestions: Question[] = [
@@ -78,6 +79,7 @@ export const defaultSettings: FormSettings = {
   consentEnabled: true,
   consentText: DEFAULT_CONSENT_TEMPLATE,
   nameDisplayEnabled: true,
+  googlePlaceId: "",
 };
 
 export const questionTypes = [

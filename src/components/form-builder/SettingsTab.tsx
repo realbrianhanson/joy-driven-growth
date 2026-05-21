@@ -184,6 +184,24 @@ export function SettingsTab({ settings, setSettings, slugUrl, aiUrl }: Props) {
           )}
         </CardContent>
       </Card>
+
+      <Card className="rounded-xl">
+        <CardContent className="p-5 space-y-3">
+          <h3 className="font-semibold text-foreground">Google reviews</h3>
+          <div>
+            <Label className="text-sm">Google Place ID</Label>
+            <Input
+              value={settings.googlePlaceId}
+              onChange={(e) => setSettings({ ...settings, googlePlaceId: e.target.value })}
+              placeholder="ChIJ..."
+              className="mt-1 font-mono text-xs"
+            />
+            <p className="text-xs text-muted-foreground mt-2">
+              After every submission, we'll invite the reviewer to also post on Google. Find your Place ID with Google's Place ID Finder (it looks like <code>ChIJ...</code>). Leave blank to hide the Google prompt.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
