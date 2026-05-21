@@ -515,11 +515,13 @@ function StepShell({ index, total, brandColor, children }: { index: number; tota
   );
 }
 
-function LabeledInput({ label, value, onChange, placeholder, required, type = "text" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean; type?: string }) {
+function LabeledInput({ label, value, onChange, placeholder, required, optional, type = "text" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean; optional?: boolean; type?: string }) {
   return (
     <div>
       <label className="text-sm font-medium text-foreground">
-        {label}{required && <span className="text-destructive ml-1">*</span>}
+        {label}
+        {required && <span className="text-destructive ml-1">*</span>}
+        {optional && <span className="text-muted-foreground font-normal ml-1">(optional)</span>}
       </label>
       <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} type={type} className="mt-1" />
     </div>
