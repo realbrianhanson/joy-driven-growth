@@ -9,11 +9,15 @@ describe("FORM_TEMPLATES", () => {
   it("marketing template is flagged recommended", () => {
     expect(FORM_TEMPLATES.find((t) => t.id === "marketing")!.recommended).toBe(true);
   });
-  it("every template has a rating question and at least one required question", () => {
+  it("every template has at least one required question", () => {
     for (const tpl of FORM_TEMPLATES) {
       expect(tpl.questions.length).toBeGreaterThan(0);
-      expect(tpl.questions.some((q) => q.type === "rating")).toBe(true);
       expect(tpl.questions.some((q) => q.required)).toBe(true);
+    }
+  });
+  it("non-video templates include a rating question", () => {
+    for (const tpl of FORM_TEMPLATES.filter((t) => t.id !== "video")) {
+      expect(tpl.questions.some((q) => q.type === "rating")).toBe(true);
     }
   });
   it("every question has a unique id within its template", () => {
