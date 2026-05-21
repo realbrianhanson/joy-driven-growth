@@ -500,6 +500,49 @@ export default function PublicForm() {
               </div>
             )}
 
+            {googlePlaceId && (
+              <div className="rounded-lg p-5 mb-5 border border-border bg-muted/30 text-left">
+                <h3 className="text-sm font-semibold text-foreground mb-1 text-center">Mind sharing this on Google?</h3>
+                <p className="text-xs text-muted-foreground mb-4 text-center">
+                  It takes 30 seconds and helps more people discover us.
+                </p>
+
+                {testimonialType === "text" && content && (
+                  <div className="mb-4">
+                    <div className="rounded-lg border border-border bg-card p-3 text-sm text-foreground whitespace-pre-wrap max-h-40 overflow-y-auto">
+                      {content}
+                    </div>
+                    <div className="flex justify-center mt-2">
+                      <Button variant="outline" size="sm" onClick={copyReview}>
+                        {copiedReview ? (
+                          <><Check className="w-4 h-4 mr-2" />Copied</>
+                        ) : (
+                          <><Copy className="w-4 h-4 mr-2" />Copy review</>
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-2 text-center">
+                      Copy your words, then paste them into the Google review box.
+                    </p>
+                  </div>
+                )}
+
+                <Button
+                  className="w-full"
+                  style={{ backgroundColor: brandColor }}
+                  onClick={() =>
+                    window.open(
+                      `https://search.google.com/local/writereview?placeid=${encodeURIComponent(googlePlaceId)}`,
+                      "_blank",
+                      "noopener,noreferrer",
+                    )
+                  }
+                >
+                  Open Google Reviews <ExternalLink className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            )}
+
             <div className="mt-6 pt-4 border-t border-border">
               <p className="text-xs text-muted-foreground">Powered by</p>
               <p className="text-xs font-semibold text-foreground">Happy Client</p>
