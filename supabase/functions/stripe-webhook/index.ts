@@ -1,64 +1,23 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  planFromPriceId as planFromPriceIdShared,
+  verifyStripeSignature,
+  amountFromSession,
+} from "../_shared/stripe-utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, stripe-signature",
 };
 
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
-function planFromPriceId(priceId: string | null | undefined): "free" | "starter" | "pro" | "scale" {
+function planFromPriceId(priceId: string | null | undefined) {
   const map: Record<string, "starter" | "pro"> = {};
   const starter = Deno.env.get("STRIPE_PRICE_STARTER");
   const pro = Deno.env.get("STRIPE_PRICE_PRO");
   if (starter) map[starter] = "starter";
   if (pro) map[pro] = "pro";
-  if (!priceId) return "free";
-  return map[priceId] ?? "free";
-}
-
-async function verifyStripeSignature(
-  payload: string,
-  signature: string,
-  secret: string
-): Promise<boolean> {
-  const encoder = new TextEncoder();
-  const parts = signature.split(",");
-  const timestamp = parts.find((p) => p.startsWith("t="))?.split("=")[1];
-  const v1Signature = parts.find((p) => p.startsWith("v1="))?.split("=")[1];
-
-  if (!timestamp || !v1Signature) return false;
-
-  // Replay protection: reject if timestamp is more than 300s old
-  const ts = parseInt(timestamp, 10);
-  if (!Number.isFinite(ts)) return false;
-  const now = Math.floor(Date.now() / 1000);
-  if (Math.abs(now - ts) > 300) return false;
-
-  const signedPayload = `${timestamp}.${payload}`;
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const signatureBytes = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    encoder.encode(signedPayload)
-  );
-  const expectedSignature = Array.from(new Uint8Array(signatureBytes))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-
-  return timingSafeEqual(expectedSignature, v1Signature);
+  return planFromPriceIdShared(priceId, map);
 }
 
 serve(async (req) => {
@@ -105,7 +64,7 @@ serve(async (req) => {
       case "checkout.session.completed":
       case "payment_intent.succeeded": {
         const session = event.data.object;
-        const amount = (session.amount_total || session.amount || 0) / 100;
+        const amount = amountFromSession(session);
         const customerEmail = session.customer_email || session.receipt_email;
         const metadata = session.metadata || {};
 
