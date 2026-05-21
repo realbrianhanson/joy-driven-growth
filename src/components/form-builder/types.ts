@@ -42,7 +42,8 @@ export interface FormSettings {
   consentEnabled: boolean;
   consentText: string;
   nameDisplayEnabled: boolean;
-  googlePlaceId: string;
+  reviewPlatform: "none" | "google" | "trustpilot" | "facebook" | "g2" | "capterra" | "other";
+  reviewUrl: string;
 }
 
 export const defaultQuestions: Question[] = [
@@ -79,7 +80,8 @@ export const defaultSettings: FormSettings = {
   consentEnabled: true,
   consentText: DEFAULT_CONSENT_TEMPLATE,
   nameDisplayEnabled: true,
-  googlePlaceId: "",
+  reviewPlatform: "none",
+  reviewUrl: "",
 };
 
 export const questionTypes = [
