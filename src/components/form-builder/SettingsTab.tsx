@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import type { FormSettings } from "./types";
 
@@ -187,19 +188,58 @@ export function SettingsTab({ settings, setSettings, slugUrl, aiUrl }: Props) {
 
       <Card className="rounded-xl">
         <CardContent className="p-5 space-y-3">
-          <h3 className="font-semibold text-foreground">Google reviews</h3>
+          <h3 className="font-semibold text-foreground">External reviews</h3>
           <div>
-            <Label className="text-sm">Google Place ID</Label>
-            <Input
-              value={settings.googlePlaceId}
-              onChange={(e) => setSettings({ ...settings, googlePlaceId: e.target.value })}
-              placeholder="ChIJ..."
-              className="mt-1 font-mono text-xs"
-            />
-            <p className="text-xs text-muted-foreground mt-2">
-              After every submission, we'll invite the reviewer to also post on Google. Find your Place ID with Google's Place ID Finder (it looks like <code>ChIJ...</code>). Leave blank to hide the Google prompt.
-            </p>
+            <Label className="text-sm">Review platform</Label>
+            <Select
+              value={settings.reviewPlatform}
+              onValueChange={(v) => setSettings({ ...settings, reviewPlatform: v as FormSettings["reviewPlatform"] })}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None (don't ask)</SelectItem>
+                <SelectItem value="google">Google</SelectItem>
+                <SelectItem value="trustpilot">Trustpilot</SelectItem>
+                <SelectItem value="facebook">Facebook</SelectItem>
+                <SelectItem value="g2">G2</SelectItem>
+                <SelectItem value="capterra">Capterra</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+          {settings.reviewPlatform === "none" ? (
+            <p className="text-xs text-muted-foreground">No external review prompt will be shown after submission.</p>
+          ) : (
+            <div>
+              <Label className="text-sm">Review page URL</Label>
+              <Input
+                value={settings.reviewUrl}
+                onChange={(e) => setSettings({ ...settings, reviewUrl: e.target.value })}
+                placeholder={
+                  settings.reviewPlatform === "google"
+                    ? "ChIJ... or https://search.google.com/local/writereview?placeid=..."
+                    : "https://..."
+                }
+                className="mt-1 font-mono text-xs"
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                {settings.reviewPlatform === "google" &&
+                  <>Paste either your Google Place ID (it looks like <code>ChIJ...</code>) or your full Google review link.</>}
+                {settings.reviewPlatform === "trustpilot" &&
+                  <>Paste your Trustpilot review page URL (e.g. <code>trustpilot.com/review/yourdomain.com</code>).</>}
+                {settings.reviewPlatform === "facebook" &&
+                  <>Paste your Facebook Page reviews/recommendations URL.</>}
+                {settings.reviewPlatform === "g2" &&
+                  <>Paste your G2 product review URL.</>}
+                {settings.reviewPlatform === "capterra" &&
+                  <>Paste your Capterra product review URL.</>}
+                {settings.reviewPlatform === "other" &&
+                  <>Paste any URL where customers can leave a review.</>}
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

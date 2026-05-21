@@ -89,9 +89,35 @@ export default function PublicForm() {
     };
   }, [form]);
 
-  const googlePlaceId = useMemo(() => {
-    const s = (form?.custom_questions as { settings?: { google_place_id?: string } } | null)?.settings ?? {};
-    return (s.google_place_id ?? "").trim();
+  const reviewPrompt = useMemo(() => {
+    const s = (form?.custom_questions as { settings?: { review_platform?: string; review_url?: string; google_place_id?: string } } | null)?.settings ?? {};
+    let platform = (s.review_platform ?? "").trim();
+    let value = (s.review_url ?? "").trim();
+    if (!platform && (s.google_place_id ?? "").trim()) {
+      platform = "google";
+      value = (s.google_place_id ?? "").trim();
+    }
+    const labels: Record<string, string> = {
+      google: "Google",
+      trustpilot: "Trustpilot",
+      facebook: "Facebook",
+      g2: "G2",
+      capterra: "Capterra",
+      other: "",
+    };
+    if (!platform || platform === "none" || !value) {
+      return { show: false as const };
+    }
+    const label = labels[platform] ?? "";
+    let url: string;
+    if (platform === "google" && !/^https?:\/\//i.test(value)) {
+      url = `https://search.google.com/local/writereview?placeid=${encodeURIComponent(value)}`;
+    } else if (!/^https?:\/\//i.test(value)) {
+      url = `https://${value}`;
+    } else {
+      url = value;
+    }
+    return { show: true as const, label, url };
   }, [form]);
 
   const renderedConsentText = useMemo(
@@ -500,9 +526,11 @@ export default function PublicForm() {
               </div>
             )}
 
-            {googlePlaceId && (
+            {reviewPrompt.show && (
               <div className="rounded-lg p-5 mb-5 border border-border bg-muted/30 text-left">
-                <h3 className="text-sm font-semibold text-foreground mb-1 text-center">Mind sharing this on Google?</h3>
+                <h3 className="text-sm font-semibold text-foreground mb-1 text-center">
+                  {reviewPrompt.label ? `Mind sharing this on ${reviewPrompt.label}?` : "Mind leaving us a review?"}
+                </h3>
                 <p className="text-xs text-muted-foreground mb-4 text-center">
                   It takes 30 seconds and helps more people discover us.
                 </p>
@@ -522,7 +550,7 @@ export default function PublicForm() {
                       </Button>
                     </div>
                     <p className="text-[11px] text-muted-foreground mt-2 text-center">
-                      Copy your words, then paste them into the Google review box.
+                      Copy your words, then paste them into the review box.
                     </p>
                   </div>
                 )}
@@ -531,14 +559,11 @@ export default function PublicForm() {
                   className="w-full"
                   style={{ backgroundColor: brandColor }}
                   onClick={() =>
-                    window.open(
-                      `https://search.google.com/local/writereview?placeid=${encodeURIComponent(googlePlaceId)}`,
-                      "_blank",
-                      "noopener,noreferrer",
-                    )
+                    window.open(reviewPrompt.url, "_blank", "noopener,noreferrer")
                   }
                 >
-                  Open Google Reviews <ExternalLink className="w-4 h-4 ml-2" />
+                  {reviewPrompt.label ? `Review us on ${reviewPrompt.label}` : "Leave a review"}
+                  <ExternalLink className="w-4 h-4 ml-2" />
                 </Button>
               </div>
             )}
