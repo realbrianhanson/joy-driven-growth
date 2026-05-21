@@ -103,6 +103,14 @@ export default function PublicForm() {
 
   const brandColor = form?.primary_color ?? "#F97316";
 
+  const stepOrder = useMemo<FormStep[]>(() => {
+    const o: FormStep[] = ["testimonial"];
+    if (customQuestions.length > 0) o.push("custom");
+    o.push("info");
+    if (needsConsentStep) o.push("consent");
+    return o;
+  }, [customQuestions.length, needsConsentStep]);
+
   const fireConfetti = () => {
     confetti({
       particleCount: 80,
@@ -213,14 +221,6 @@ export default function PublicForm() {
       </div>
     );
   }
-
-  const stepOrder = useMemo<FormStep[]>(() => {
-    const o: FormStep[] = ["testimonial"];
-    if (customQuestions.length > 0) o.push("custom");
-    o.push("info");
-    if (needsConsentStep) o.push("consent");
-    return o;
-  }, [customQuestions.length, needsConsentStep]);
 
   const goNext = () => {
     if (step === "welcome") {
