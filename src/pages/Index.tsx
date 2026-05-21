@@ -22,7 +22,7 @@ import {
   MessageSquare,
   Check,
 } from "lucide-react";
-import heroDashboard from "@/assets/hero-dashboard.jpg";
+import { HeroDashboardMockup } from "@/components/landing/HeroDashboardMockup";
 
 /* ─── Animations ─── */
 const fadeUp = {
@@ -229,11 +229,7 @@ const Hero = ({ isLoggedIn }: { isLoggedIn: boolean }) => (
         {/* Ambient glow */}
         <div className="absolute -inset-6 bg-primary/5 rounded-[40px] blur-2xl opacity-60" />
         <div className="relative rounded-[28px] overflow-hidden border border-border/60 bg-card shadow-[0_32px_80px_-20px_hsl(var(--primary)/0.18),0_0_0_1px_hsl(var(--border)/0.6)] transition-transform duration-700 hover:scale-[1.005]">
-          <img
-            src={heroDashboard}
-            alt="Happy Client dashboard showing testimonial management with revenue attribution"
-            className="w-full"
-          />
+          <HeroDashboardMockup />
           {/* Glass overlay gradient at bottom */}
           <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background to-transparent" />
         </div>
