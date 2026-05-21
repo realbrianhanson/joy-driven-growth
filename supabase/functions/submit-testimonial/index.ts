@@ -19,6 +19,23 @@ async function sha256Hex(input: string): Promise<string> {
     .join('')
 }
 
+function getClientIp(req: Request): string {
+  const xff = req.headers.get('x-forwarded-for') || ''
+  const ip = xff.split(',')[0]?.trim()
+  return ip || 'unknown'
+}
+
+// Only allow https URLs hosted on the project's own Supabase storage domain.
+function isAllowedMediaUrl(value: unknown, allowedHost: string): boolean {
+  if (typeof value !== 'string' || value.length === 0) return false
+  try {
+    const u = new URL(value)
+    return u.protocol === 'https:' && u.hostname === allowedHost
+  } catch {
+    return false
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
@@ -27,6 +44,23 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   )
+
+  // IP-based rate limit: 20 / 60s.
+  const ip = getClientIp(req)
+  const { data: rlAllowed, error: rlErr } = await supabase.rpc('check_rate_limit', {
+    p_key: `submit-testimonial:${ip}`,
+    p_max: 20,
+    p_window_seconds: 60,
+  })
+  if (rlErr) console.error('rate_limit error', rlErr)
+  if (rlAllowed === false) return json({ error: 'rate_limited' }, 429)
+
+  let supabaseHost = ''
+  try {
+    supabaseHost = new URL(Deno.env.get('SUPABASE_URL')!).hostname
+  } catch {
+    return json({ error: 'server_misconfigured' }, 500)
+  }
 
   let body: any
   try {
@@ -80,6 +114,17 @@ Deno.serve(async (req) => {
   if (type === 'video' && !body.video_url) return json({ error: 'missing_video_url' }, 400)
   if (type === 'audio' && !body.audio_url) return json({ error: 'missing_audio_url' }, 400)
 
+  // Validate media URLs: must be https and hosted on the project storage domain.
+  if (body.video_url != null && !isAllowedMediaUrl(body.video_url, supabaseHost)) {
+    return json({ error: 'invalid_video_url' }, 400)
+  }
+  if (body.audio_url != null && !isAllowedMediaUrl(body.audio_url, supabaseHost)) {
+    return json({ error: 'invalid_audio_url' }, 400)
+  }
+  if (body.author_avatar != null && !isAllowedMediaUrl(body.author_avatar, supabaseHost)) {
+    return json({ error: 'invalid_author_avatar' }, 400)
+  }
+
   const rating = body.rating != null ? Math.max(1, Math.min(5, parseInt(body.rating))) : null
 
   const allowedDisplay = ['full', 'first_initial', 'anonymous'] as const
@@ -112,6 +157,7 @@ Deno.serve(async (req) => {
     type,
     video_url: body.video_url ? String(body.video_url) : null,
     audio_url: body.audio_url ? String(body.audio_url) : null,
+    author_avatar: body.author_avatar ? String(body.author_avatar) : null,
     custom_fields: body.custom_fields && typeof body.custom_fields === 'object' ? body.custom_fields : {},
     status: 'pending',
     source,
