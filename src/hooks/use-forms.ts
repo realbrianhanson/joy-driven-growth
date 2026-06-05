@@ -52,7 +52,9 @@ export const useFormBySlug = (slug: string) => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("forms")
-        .select("*")
+        .select(
+          "id, slug, name, logo_url, primary_color, welcome_title, welcome_message, thank_you_title, thank_you_message, incentive_enabled, incentive_type, incentive_value, custom_questions, require_photo, require_rating, collect_text, collect_audio, collect_video, is_published"
+        )
         .eq("slug", slug)
         .eq("is_published", true)
         .maybeSingle();
