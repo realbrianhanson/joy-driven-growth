@@ -65,11 +65,24 @@ const Analytics = () => {
   const formatNumber = (num: number) => (num >= 1000 ? (num / 1000).toFixed(1) + "k" : num.toString());
 
   const handleExportCsv = async () => {
+    if (isDemoMode) {
+      toast("Export disabled in demo mode", { description: "Turn off Demo Mode to export your real data." });
+      return;
+    }
     if (!workspaceOwnerId) return;
+    const rangeStart = (() => {
+      const d = new Date();
+      if (dateRange === "today") d.setHours(0, 0, 0, 0);
+      else if (dateRange === "7d") d.setDate(d.getDate() - 7);
+      else if (dateRange === "30d") d.setDate(d.getDate() - 30);
+      else if (dateRange === "90d") d.setDate(d.getDate() - 90);
+      return d.toISOString();
+    })();
     const { data, error } = await supabase
       .from("testimonials")
       .select("created_at, author_name, author_email, author_company, content, rating, type, status, source, revenue_attributed")
       .eq("user_id", workspaceOwnerId)
+      .gte("created_at", rangeStart)
       .order("created_at", { ascending: false });
     if (error) {
       toast.error("Export failed", { description: error.message });
@@ -557,15 +570,6 @@ const Analytics = () => {
             </CardContent>
           </Card>
         </div>
-
-        {/* ============ INSIGHTS ============ */}
-        <Card className="bg-card border border-border rounded-xl shadow-none mb-3">
-          <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">
-              AI-generated insights appear here as you collect more testimonials. We need at least 10 approved testimonials with revenue attribution to surface trends.
-            </p>
-          </CardContent>
-        </Card>
 
         {/* ============ EXPORT OPTIONS ============ */}
         <Card className="bg-card border border-border rounded-xl shadow-none">
