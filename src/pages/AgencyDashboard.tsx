@@ -50,6 +50,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useDemoMode } from "@/contexts/DemoModeContext";
 
 interface Client {
   id: string;
@@ -76,10 +77,9 @@ const healthConfig = {
 };
 
 const AgencyDashboard = () => {
-  const [clients] = useState<Client[]>(mockClients);
+  const { isDemoMode } = useDemoMode();
+  const [clients] = useState<Client[]>(isDemoMode ? mockClients : []);
   const [searchQuery, setSearchQuery] = useState("");
-  const [newClientName, setNewClientName] = useState("");
-  const [newClientDomain, setNewClientDomain] = useState("");
 
   const filteredClients = clients.filter(client =>
     client.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -97,19 +97,21 @@ const AgencyDashboard = () => {
     }).format(amount);
   };
 
-  const handleAddClient = () => {
-    if (!newClientName) {
-      toast.error("Please enter a client name");
-      return;
-    }
-    toast.success(`Client "${newClientName}" added!`);
-    setNewClientName("");
-    setNewClientDomain("");
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <div className="container max-w-7xl mx-auto py-8 px-4">
+        {!isDemoMode && (
+          <div className="text-center py-24 border border-dashed border-border rounded-xl">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary/10 mb-4">
+              <Building2 className="w-5 h-5 text-primary" />
+            </div>
+            <h3 className="text-base font-semibold text-foreground mb-1.5">Agency workspaces are coming soon</h3>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              Multi-client workspaces, custom domains, and white-label dashboards are in design. Turn on Demo Mode to preview the UI.
+            </p>
+          </div>
+        )}
+        {isDemoMode && (<>
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 mb-6 flex items-start gap-3">
           <span className="text-2xl">🚧</span>
           <div>
@@ -131,47 +133,10 @@ const AgencyDashboard = () => {
             <h1 className="text-3xl font-display font-bold text-foreground">Agency Dashboard</h1>
             <p className="text-muted-foreground mt-1">Manage all your clients in one place</p>
           </div>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button className="gradient-sunny text-white shadow-warm hover:shadow-warm-lg transition-all">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Client
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Client</DialogTitle>
-                <DialogDescription>Set up a new client workspace</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label>Company Name</Label>
-                  <Input 
-                    value={newClientName}
-                    onChange={(e) => setNewClientName(e.target.value)}
-                    placeholder="Acme Corp"
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Custom Domain (optional)</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Globe className="w-4 h-4 text-muted-foreground" />
-                    <Input 
-                      value={newClientDomain}
-                      onChange={(e) => setNewClientDomain(e.target.value)}
-                      placeholder="testimonials.client.com"
-                    />
-                  </div>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={handleAddClient} className="gradient-sunny text-white">
-                  Add Client
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button disabled variant="outline" title="Available once agency workspaces ship">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Client
+          </Button>
         </div>
 
         {/* Overview Stats */}
@@ -317,35 +282,7 @@ const AgencyDashboard = () => {
                       </TableCell>
                       <TableCell className="text-muted-foreground">{client.lastActivity}</TableCell>
                       <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="bg-card border-border">
-                            <DropdownMenuItem className="cursor-pointer">
-                              <Eye className="w-4 h-4 mr-2" />
-                              View Dashboard
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer">
-                              <BarChart3 className="w-4 h-4 mr-2" />
-                              Analytics
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer">
-                              <Settings className="w-4 h-4 mr-2" />
-                              Settings
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer">
-                              <Users className="w-4 h-4 mr-2" />
-                              Manage Users
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer text-destructive">
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Remove Client
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {/* Actions ship with real agency workspaces */}
                       </TableCell>
                     </TableRow>
                   );
@@ -364,6 +301,7 @@ const AgencyDashboard = () => {
             </p>
           </div>
         )}
+        </>)}
       </div>
     </div>
   );
