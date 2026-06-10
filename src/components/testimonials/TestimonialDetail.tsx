@@ -595,21 +595,24 @@ export function TestimonialDetail({
                     {formatCurrency(revenueData.total)}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Conversions</span>
-                  <span className="font-medium">{revenueData.conversions}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Widget</span>
-                  <span className="font-medium">{revenueData.widget}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Last conversion</span>
-                  <span className="font-medium">{revenueData.lastConversion}</span>
-                </div>
-                <Button variant="link" className="p-0 h-auto text-primary">
-                  View attribution details <ChevronRight className="w-4 h-4" />
-                </Button>
+                {revenueData.conversions !== undefined && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Conversions</span>
+                    <span className="font-medium">{revenueData.conversions}</span>
+                  </div>
+                )}
+                {revenueData.widget && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Widget</span>
+                    <span className="font-medium">{revenueData.widget}</span>
+                  </div>
+                )}
+                {revenueData.lastConversion && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Last conversion</span>
+                    <span className="font-medium">{revenueData.lastConversion}</span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
