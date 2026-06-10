@@ -186,6 +186,35 @@ const WallBuilder = () => {
 
   const selectedData = testimonials.filter(t => selectedTestimonials.includes(t.id));
 
+  if (!isNew && loadingWall) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="space-y-3 w-full max-w-md">
+          <Skeleton className="h-8 w-48 mx-auto" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!isNew && wallError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="text-center max-w-md">
+          <div className="w-12 h-12 rounded-xl bg-destructive/10 mx-auto mb-4 flex items-center justify-center">
+            <AlertCircle className="w-6 h-6 text-destructive" />
+          </div>
+          <h1 className="text-lg font-semibold text-foreground mb-1">Couldn't load this wall</h1>
+          <p className="text-sm text-muted-foreground mb-5">{wallError instanceof Error ? wallError.message : "Something went wrong."}</p>
+          <div className="flex gap-2 justify-center">
+            <Link to="/dashboard/walls"><Button variant="outline">Back</Button></Link>
+            <Button onClick={() => refetchWall()}>Retry</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
