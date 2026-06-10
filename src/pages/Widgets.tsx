@@ -17,12 +17,23 @@ import {
   BarChart3,
   Grid3X3,
   Star,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -76,8 +87,9 @@ const Widgets = () => {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const { isDemoMode } = useDemoMode();
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  const { data: realWidgets = [], isLoading: realLoading } = useQuery({
+  const { data: realWidgets = [], isLoading: realLoading, error: widgetsError, refetch } = useQuery({
     queryKey: ['widgets', workspaceOwnerId],
     queryFn: async () => {
       if (!workspaceOwnerId) return [];
@@ -106,6 +118,29 @@ const Widgets = () => {
     },
     onError: () => toast.error('Failed to delete widget'),
   });
+
+  const handleDeleteRequest = (id: string) => {
+    if (isDemoMode) {
+      toast.info("Switch to live data to delete widgets.");
+      return;
+    }
+    setDeleteTarget(id);
+  };
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget;
+    setDeleteTarget(null);
+    deleteWidget.mutate(id);
+  };
+
+  const handlePreview = (widgetId: string) => {
+    if (isDemoMode) {
+      toast.info("Switch to live data to preview real widgets.");
+      return;
+    }
+    window.open(`/embed/widget/${widgetId}`, "_blank", "noopener,noreferrer");
+  };
 
   const filteredWidgets = widgets.filter(widget =>
     widget.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -185,8 +220,20 @@ const Widgets = () => {
           </div>
         )}
 
+        {/* Error State */}
+        {!isLoading && widgetsError && !isDemoMode && (
+          <div className="text-center py-24 border border-dashed border-destructive/30 rounded-xl">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-destructive/10 mb-4">
+              <AlertCircle className="w-5 h-5 text-destructive" />
+            </div>
+            <h3 className="text-base font-semibold text-foreground mb-1.5">Couldn't load widgets</h3>
+            <p className="text-sm text-muted-foreground mb-5">{widgetsError instanceof Error ? widgetsError.message : "Something went wrong."}</p>
+            <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
+          </div>
+        )}
+
         {/* Widgets Grid */}
-        {!isLoading && (
+        {!isLoading && !widgetsError && (
           <div className="grid gap-2">
             {filteredWidgets.map((widget) => {
               const typeInfo = getWidgetTypeInfo(widget.type || 'carousel');
@@ -247,8 +294,8 @@ const Widgets = () => {
                               <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"><MoreVertical className="w-4 h-4" /></Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="bg-card border-border">
-                              <DropdownMenuItem className="cursor-pointer"><ExternalLink className="w-4 h-4 mr-2" />Preview</DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer text-destructive" onClick={() => deleteWidget.mutate(widget.id)}>
+                              <DropdownMenuItem className="cursor-pointer" onClick={() => handlePreview(widget.id)}><ExternalLink className="w-4 h-4 mr-2" />Preview</DropdownMenuItem>
+                              <DropdownMenuItem className="cursor-pointer text-destructive" onClick={() => handleDeleteRequest(widget.id)}>
                                 <Trash2 className="w-4 h-4 mr-2" />Delete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -271,7 +318,7 @@ const Widgets = () => {
           </div>
         )}
 
-        {!isLoading && filteredWidgets.length === 0 && (
+        {!isLoading && !widgetsError && filteredWidgets.length === 0 && (
           <div className="text-center py-24 border border-dashed border-border rounded-xl">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-light mb-4">
               <Bell className="w-5 h-5 text-primary" />
@@ -283,6 +330,19 @@ const Widgets = () => {
             </Link>
           </div>
         )}
+
+        <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete widget?</AlertDialogTitle>
+              <AlertDialogDescription>This will remove the widget. Any sites embedding it will stop displaying testimonials.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
