@@ -21,6 +21,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { useDemoMode } from "@/contexts/DemoModeContext";
 import { MOCK_CAMPAIGNS } from "@/data/mock/campaigns";
+import { usePlan } from "@/hooks/use-plan";
 
 const PLAN_SMS_LIMITS: Record<string, number | null> = {
   free: 0,
@@ -34,6 +35,7 @@ export default function Campaigns() {
   const { user } = useAuth();
   const { workspaceOwnerId } = useWorkspace();
   const { isDemoMode } = useDemoMode();
+  const { plan } = usePlan();
   const queryClient = useQueryClient();
   const [detailCampaign, setDetailCampaign] = useState<any | null>(null);
 
@@ -50,17 +52,6 @@ export default function Campaigns() {
       return data;
     },
     enabled: !!workspaceOwnerId && !isDemoMode,
-  });
-
-  // Plan
-  const { data: plan } = useQuery({
-    queryKey: ["user-plan", workspaceOwnerId],
-    enabled: !!workspaceOwnerId && !isDemoMode,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_user_plan", { p_user_id: workspaceOwnerId! });
-      if (error) throw error;
-      return (data as string) || "free";
-    },
   });
 
   // SMS sent this month (count of sent campaign_jobs created this month)
