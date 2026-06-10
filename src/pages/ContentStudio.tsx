@@ -6,6 +6,7 @@ import {
   Linkedin, Mail, FileText, Image, Scissors, Bot,
   Lock, Loader2, Instagram
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +17,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useWorkspace } from "@/hooks/use-workspace";
+import { usePlan } from "@/hooks/use-plan";
 import ContentRenderer, { flattenContent } from "@/components/content/ContentRenderer";
 
 interface ContentType {
@@ -47,6 +49,7 @@ interface GeneratedResult {
 const ContentStudio = () => {
   const { user } = useAuth();
   const { workspaceOwnerId } = useWorkspace();
+  const { isPro, isLoading: planLoading } = usePlan();
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<'all' | 'top' | 'video' | 'revenue'>('all');
   const [selectedTestimonials, setSelectedTestimonials] = useState<string[]>([]);
@@ -128,11 +131,13 @@ const ContentStudio = () => {
       });
 
       // Save to generated_content
+      const readable = flattenContent(selectedContentType, data.content);
       await supabase.from('generated_content').insert({
         user_id: workspaceOwnerId,
         testimonial_ids: selectedTestimonials,
         type: contentTypeInfo?.dbType as any,
-        content: JSON.stringify(result.data),
+        content: readable || JSON.stringify(result.data),
+        metadata: { structured: result.data, contentTypeKey: selectedContentType } as any,
       });
 
       toast.success('Content generated and saved');
@@ -245,11 +250,12 @@ const ContentStudio = () => {
                 <div className="grid grid-cols-2 gap-2">
                   {contentTypes.map((type) => {
                     const isSelected = selectedContentType === type.id;
+                    const locked = !!type.isPro && !isPro && !planLoading;
                     return (
-                      <button key={type.id} onClick={() => !type.isPro && setSelectedContentType(type.id)} disabled={type.isPro}
+                      <button key={type.id} onClick={() => !locked && setSelectedContentType(type.id)} disabled={locked}
                         className={`relative p-3 rounded-lg border text-left transition-colors ${
                           isSelected ? 'border-primary bg-primary-light' :
-                          type.isPro ? 'border-border bg-muted/30 opacity-60' :
+                          locked ? 'border-border bg-muted/30 opacity-60' :
                           'border-border hover:border-border-hover'
                         }`}>
                         <div className={`w-7 h-7 rounded-md flex items-center justify-center mb-2 ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
@@ -257,7 +263,7 @@ const ContentStudio = () => {
                         </div>
                         <div className="font-medium text-sm text-foreground">{type.title}</div>
                         <div className="text-xs text-muted-foreground mt-0.5">{type.subtitle}</div>
-                        {type.isPro && (
+                        {type.isPro && locked && (
                           <div className="absolute top-2 right-2 inline-flex items-center gap-1 text-[9px] uppercase tracking-wider font-medium text-muted-foreground">
                             <Lock className="w-2.5 h-2.5" /> Pro
                           </div>
@@ -271,6 +277,14 @@ const ContentStudio = () => {
                     );
                   })}
                 </div>
+                {!isPro && !planLoading && (
+                  <div className="mt-3 text-xs text-muted-foreground flex items-center justify-between">
+                    <span>Pro formats unlock visual + video content.</span>
+                    <Link to="/dashboard/settings/billing" className="text-primary font-medium hover:underline">
+                      Upgrade to Pro
+                    </Link>
+                  </div>
+                )}
                 <Button
                   className="w-full mt-5 h-9"
                   disabled={selectedTestimonials.length === 0 || !selectedContentType || isGenerating}
