@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
   Search, Plus, Twitter, Linkedin, Mail, FileText,
-  Image, Scissors, Copy, Trash2, MoreVertical,
+  Image, Scissors, Bot, Video, Copy, Trash2, MoreVertical, AlertCircle,
   Calendar, Filter, Instagram
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useWorkspace } from "@/hooks/use-workspace";
+import { readableStoredContent } from "@/components/content/ContentRenderer";
 
 const typeConfig: Record<string, { label: string; icon: any }> = {
   twitter_thread: { label: 'Twitter Thread', icon: Twitter },
@@ -29,8 +30,8 @@ const typeConfig: Record<string, { label: string; icon: any }> = {
   email_snippet: { label: 'Email Snippet', icon: Mail },
   case_study: { label: 'Case Study', icon: FileText },
   quote_graphic: { label: 'Quote Graphic', icon: Image },
-  video_highlight: { label: 'Video Highlight', icon: Scissors },
-  ai_avatar: { label: 'AI Avatar', icon: Scissors },
+  video_highlight: { label: 'Video Highlight', icon: Video },
+  ai_avatar: { label: 'AI Avatar', icon: Bot },
 };
 
 const ContentLibrary = () => {
@@ -40,7 +41,7 @@ const ContentLibrary = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
-  const { data: content = [], isLoading } = useQuery({
+  const { data: content = [], isLoading, error: contentError, refetch } = useQuery({
     queryKey: ['generated-content', workspaceOwnerId],
     queryFn: async () => {
       if (!workspaceOwnerId) return [];
@@ -64,10 +65,12 @@ const ContentLibrary = () => {
       queryClient.invalidateQueries({ queryKey: ['generated-content'] });
       toast.success('Content deleted');
     },
+    onError: (e: Error) => toast.error('Failed to delete', { description: e.message }),
   });
 
   const filteredContent = content.filter(item => {
-    const matchesSearch = (item.content || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const readable = readableStoredContent(item.type, item.content);
+    const matchesSearch = readable.toLowerCase().includes(searchQuery.toLowerCase());
     if (typeFilter === 'all') return matchesSearch;
     return matchesSearch && item.type === typeFilter;
   });
@@ -103,14 +106,26 @@ const ContentLibrary = () => {
               <SelectItem value="all">All Types</SelectItem>
               <SelectItem value="twitter_thread">Twitter</SelectItem>
               <SelectItem value="linkedin_post">LinkedIn</SelectItem>
+              <SelectItem value="instagram_carousel">Instagram Carousel</SelectItem>
               <SelectItem value="email_snippet">Email</SelectItem>
               <SelectItem value="case_study">Case Study</SelectItem>
               <SelectItem value="quote_graphic">Quote Graphic</SelectItem>
+              <SelectItem value="video_highlight">Video Highlight</SelectItem>
+              <SelectItem value="ai_avatar">AI Avatar</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        {isLoading ? (
+        {contentError ? (
+          <div className="text-center py-16 border border-dashed border-destructive/30 rounded-xl">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-destructive/10 mb-4">
+              <AlertCircle className="w-5 h-5 text-destructive" />
+            </div>
+            <h3 className="text-base font-semibold text-foreground mb-1.5">Couldn't load content</h3>
+            <p className="text-sm text-muted-foreground mb-5">{contentError instanceof Error ? contentError.message : 'Something went wrong.'}</p>
+            <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
+          </div>
+        ) : isLoading ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
             {[1,2,3].map(i => <Card key={i} className="bg-card"><CardContent className="p-5"><Skeleton className="h-32 w-full" /></CardContent></Card>)}
           </div>
@@ -118,6 +133,7 @@ const ContentLibrary = () => {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
             {filteredContent.map((item) => {
               const tc = typeConfig[item.type] || { label: item.type, icon: FileText };
+              const readable = readableStoredContent(item.type, item.content);
               return (
                 <Card key={item.id} className="bg-card border border-border hover:border-border-hover transition-colors rounded-xl shadow-none group">
                   <CardContent className="p-5">
@@ -135,7 +151,7 @@ const ContentLibrary = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-card border-border">
-                          <DropdownMenuItem className="cursor-pointer" onClick={() => copyContent(item.content || '')}>
+                          <DropdownMenuItem className="cursor-pointer" onClick={() => copyContent(readable)}>
                             <Copy className="w-4 h-4 mr-2" />Copy
                           </DropdownMenuItem>
                           <DropdownMenuItem className="cursor-pointer text-destructive" onClick={() => deleteContent.mutate(item.id)}>
@@ -145,7 +161,7 @@ const ContentLibrary = () => {
                       </DropdownMenu>
                     </div>
 
-                    <p className="text-sm text-foreground/80 line-clamp-4 mb-3 leading-relaxed">{item.content}</p>
+                    <p className="text-sm text-foreground/80 line-clamp-4 mb-3 leading-relaxed whitespace-pre-wrap">{readable}</p>
 
                     <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border">
                       <span className="tabular-nums">{item.testimonial_ids?.length || 0} testimonials</span>
@@ -153,7 +169,7 @@ const ContentLibrary = () => {
                     </div>
 
                     <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="outline" size="sm" className="flex-1 h-8" onClick={() => copyContent(item.content || '')}>
+                      <Button variant="outline" size="sm" className="flex-1 h-8" onClick={() => copyContent(readable)}>
                         <Copy className="w-3 h-3 mr-1.5" />Copy
                       </Button>
                     </div>
