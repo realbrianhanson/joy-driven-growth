@@ -488,7 +488,7 @@ const Analytics = () => {
                   </TableHeader>
                   <TableBody>
                     {widgetTableData.map((widget) => (
-                      <TableRow key={widget.id} className="cursor-pointer hover:bg-secondary/50">
+                      <TableRow key={widget.id}>
                         <TableCell className="font-medium">{widget.name}</TableCell>
                         <TableCell><span className="text-xs uppercase tracking-wider font-medium text-muted-foreground">{widget.type}</span></TableCell>
                         <TableCell className="text-right tabular-nums">{formatNumber(widget.impressions)}</TableCell>
@@ -552,7 +552,7 @@ const Analytics = () => {
               {topPerformersList.length > 0 ? (
                 <div className="space-y-1">
                   {topPerformersList.map((performer) => (
-                    <div key={performer.rank} className="flex items-center justify-between py-1.5 hover:bg-muted/40 -mx-2 px-2 rounded-md transition-colors cursor-pointer">
+                    <div key={performer.rank} className="flex items-center justify-between py-1.5 -mx-2 px-2 rounded-md">
                       <div className="flex items-center gap-3 min-w-0">
                         <span className="text-xs font-medium tabular-nums text-muted-foreground w-4">{performer.rank}</span>
                         <div className="min-w-0">
