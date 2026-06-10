@@ -77,6 +77,24 @@ export type Database = {
         }
         Relationships: []
       }
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
       campaign_jobs: {
         Row: {
           attempted_at: string | null
@@ -940,6 +958,16 @@ export type Database = {
         }[]
       }
       get_my_team_owner: { Args: never; Returns: string }
+      get_team_member_profiles: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          full_name: string
+          member_user_id: string
+          role: string
+        }[]
+      }
       get_user_plan: { Args: { p_user_id: string }; Returns: string }
       get_wall_public: { Args: { p_slug: string }; Returns: Json }
       get_widget_public: { Args: { p_widget_id: string }; Returns: Json }
