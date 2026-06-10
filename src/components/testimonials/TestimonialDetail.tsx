@@ -22,9 +22,9 @@ interface AiAnalysis {
 
 interface RevenueAttribution {
   total: number;
-  conversions: number;
-  widget: string;
-  lastConversion: string;
+  conversions?: number;
+  widget?: string;
+  lastConversion?: string;
 }
 
 interface TestimonialDetailProps {
