@@ -1,14 +1,11 @@
 import { useLocation, Link } from "react-router-dom";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 import { Home, Search, LayoutDashboard, FileText, BarChart3 } from "lucide-react";
-import { useState } from "react";
 
 const NotFound = () => {
   const location = useLocation();
-  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     console.error("404 Error: User attempted to access non-existent route:", location.pathname);
@@ -41,16 +38,6 @@ const NotFound = () => {
         <p className="text-xs text-muted-foreground mb-8">
           <code className="px-2 py-1 bg-muted rounded text-xs">{location.pathname}</code>
         </p>
-
-        <div className="relative max-w-sm mx-auto mb-8">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search for something..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 h-10"
-          />
-        </div>
 
         <p className="text-xs text-muted-foreground mb-3">Popular pages</p>
         <div className="flex flex-wrap justify-center gap-2 mb-8">

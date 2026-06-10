@@ -76,7 +76,7 @@ export const defaultSettings: FormSettings = {
   reviewRoutingEnabled: false,
   positiveThreshold: 4,
   positiveAction: "google",
-  negativeAction: "support@example.com",
+  negativeAction: "",
   consentEnabled: true,
   consentText: DEFAULT_CONSENT_TEMPLATE,
   nameDisplayEnabled: true,

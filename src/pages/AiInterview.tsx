@@ -241,7 +241,14 @@ export default function AiInterview() {
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              if (userMessageCount >= MAX_USER_MESSAGES) {
+                sendMessage(true);
+              } else {
+                sendMessage();
+              }
+            }}
             placeholder="Type your response..."
             disabled={isThinking || phase === "submitting"}
           />
