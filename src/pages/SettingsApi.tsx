@@ -12,6 +12,7 @@ import {
 import SettingsLayout from "@/components/settings/SettingsLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useWorkspace } from "@/hooks/use-workspace";
 import { toast } from "sonner";
 
 async function sha256Hex(input: string): Promise<string> {
@@ -29,6 +30,7 @@ function generateApiKey(): { full: string; prefix: string } {
 
 const SettingsApi = () => {
   const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -36,13 +38,13 @@ const SettingsApi = () => {
   const [copied, setCopied] = useState(false);
 
   const keys = useQuery({
-    queryKey: ["api-keys", user?.id],
-    enabled: !!user,
+    queryKey: ["api-keys", workspaceOwnerId],
+    enabled: !!workspaceOwnerId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("api_keys")
         .select("id, name, key_prefix, last_used_at, revoked_at, created_at")
-        .eq("user_id", user!.id)
+        .eq("user_id", workspaceOwnerId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
@@ -50,13 +52,13 @@ const SettingsApi = () => {
   });
 
   const handleCreate = async () => {
-    if (!name.trim() || !user) return;
+    if (!name.trim() || !workspaceOwnerId) return;
     setCreating(true);
     try {
       const { full, prefix } = generateApiKey();
       const key_hash = await sha256Hex(full);
       const { error } = await supabase.from("api_keys").insert({
-        user_id: user.id,
+        user_id: workspaceOwnerId,
         name: name.trim(),
         key_prefix: prefix,
         key_hash,
@@ -84,6 +86,7 @@ const SettingsApi = () => {
       toast.success("Key revoked");
       qc.invalidateQueries({ queryKey: ["api-keys"] });
     },
+    onError: (e: Error) => toast.error("Failed to revoke", { description: e.message }),
   });
 
   const copy = (text: string) => {
@@ -127,7 +130,9 @@ const SettingsApi = () => {
         <Card>
           <CardHeader>
             <CardTitle>Your keys</CardTitle>
-            <CardDescription>Revoking a key immediately blocks all requests using it.</CardDescription>
+            <CardDescription>
+              API keys belong to this workspace — all team members share the same keys. Revoking a key immediately blocks all requests using it.
+            </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             {keys.isLoading ? (
