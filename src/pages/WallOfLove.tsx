@@ -121,15 +121,6 @@ const WallOfLove = () => {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3].map(i => <Card key={i}><CardContent className="p-6"><Skeleton className="h-40 w-full" /></CardContent></Card>)}
           </div>
-        ) : filteredWalls.length === 0 ? (
-          <div className="text-center py-24 border border-dashed border-border rounded-xl">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-light mb-4">
-              <Heart className="w-5 h-5 text-primary" />
-            </div>
-            <h3 className="text-base font-semibold text-foreground mb-1.5">Create your first wall</h3>
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-5">Build a beautiful public page to showcase your best testimonials.</p>
-            <Link to="/dashboard/walls/new"><Button size="sm"><Plus className="w-4 h-4 mr-1.5" />Create Wall</Button></Link>
-          </div>
         ) : wallsError && !isDemoMode ? (
           <div className="text-center py-24 border border-dashed border-destructive/30 rounded-xl">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-destructive/10 mb-4">
@@ -138,6 +129,15 @@ const WallOfLove = () => {
             <h3 className="text-base font-semibold text-foreground mb-1.5">Couldn't load walls</h3>
             <p className="text-sm text-muted-foreground mb-5">{wallsError instanceof Error ? wallsError.message : "Something went wrong."}</p>
             <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
+          </div>
+        ) : filteredWalls.length === 0 ? (
+          <div className="text-center py-24 border border-dashed border-border rounded-xl">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-light mb-4">
+              <Heart className="w-5 h-5 text-primary" />
+            </div>
+            <h3 className="text-base font-semibold text-foreground mb-1.5">Create your first wall</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-5">Build a beautiful public page to showcase your best testimonials.</p>
+            <Link to="/dashboard/walls/new"><Button size="sm"><Plus className="w-4 h-4 mr-1.5" />Create Wall</Button></Link>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
