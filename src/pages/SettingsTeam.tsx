@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Trash2, Copy, Check, Send, X } from "lucide-react";
+import { Loader2, Trash2, Copy, Check, Send, X, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import SettingsLayout from "@/components/settings/SettingsLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -18,16 +22,31 @@ const SettingsTeam = () => {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"member" | "admin">("member");
   const [copied, setCopied] = useState<string | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<{ id: string; label: string } | null>(null);
 
   const members = useQuery({
     queryKey: ["team-members", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("team_members")
-        .select("id, member_user_id, role, created_at")
-        .eq("owner_user_id", user!.id)
-        .order("created_at", { ascending: false });
+      const [tm, profiles] = await Promise.all([
+        supabase
+          .from("team_members")
+          .select("id, member_user_id, role, created_at")
+          .eq("owner_user_id", user!.id)
+          .order("created_at", { ascending: false }),
+        supabase.rpc("get_team_member_profiles"),
+      ]);
+      if (tm.error) throw tm.error;
+      const profileMap = new Map<string, { full_name: string | null; email: string | null }>();
+      for (const p of (profiles.data as Array<{ member_user_id: string; full_name: string | null; email: string | null }> | null) ?? []) {
+        profileMap.set(p.member_user_id, { full_name: p.full_name, email: p.email });
+      }
+      const data = (tm.data ?? []).map((m) => ({
+        ...m,
+        full_name: profileMap.get(m.member_user_id)?.full_name ?? null,
+        email: profileMap.get(m.member_user_id)?.email ?? null,
+      }));
+      const error = null;
       if (error) throw error;
       return data ?? [];
     },
@@ -88,6 +107,7 @@ const SettingsTeam = () => {
       toast.success("Invite revoked");
       qc.invalidateQueries({ queryKey: ["team-invites"] });
     },
+    onError: (e: Error) => toast.error("Failed to revoke", { description: e.message }),
   });
 
   const removeMember = useMutation({
@@ -98,7 +118,9 @@ const SettingsTeam = () => {
     onSuccess: () => {
       toast.success("Member removed");
       qc.invalidateQueries({ queryKey: ["team-members"] });
+      setRemoveTarget(null);
     },
+    onError: (e: Error) => toast.error("Failed to remove member", { description: e.message }),
   });
 
   const copyLink = (token: string) => {
@@ -204,6 +226,14 @@ const SettingsTeam = () => {
             <CardDescription>People with access to this account.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
+            {members.isLoading ? (
+              <p className="text-sm text-muted-foreground p-6">Loading…</p>
+            ) : members.error ? (
+              <div className="flex items-start gap-3 p-6 text-sm text-destructive">
+                <AlertCircle className="w-4 h-4 mt-0.5" />
+                Couldn't load members. {members.error instanceof Error ? members.error.message : ""}
+              </div>
+            ) : (
             <ul className="divide-y divide-border">
               <li className="flex items-center gap-4 px-6 py-3.5">
                 <div className="flex-1 min-w-0">
@@ -217,18 +247,48 @@ const SettingsTeam = () => {
                 <li key={m.id} className="flex items-center gap-4 px-6 py-3.5">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-mono text-muted-foreground truncate">{m.member_user_id.slice(0, 8)}…</span>
+                      <span className="text-sm font-medium text-foreground truncate">
+                        {m.full_name || m.email || `${m.member_user_id.slice(0, 8)}…`}
+                      </span>
                       <Badge variant="secondary" className="text-[10px] uppercase tracking-wider">{m.role}</Badge>
                     </div>
+                    {m.email && m.full_name && (
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">{m.email}</p>
+                    )}
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => removeMember.mutate(m.id)}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setRemoveTarget({ id: m.id, label: m.full_name || m.email || m.member_user_id.slice(0, 8) })}
+                  >
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </li>
               ))}
             </ul>
+            )}
           </CardContent>
         </Card>
+
+        <AlertDialog open={!!removeTarget} onOpenChange={(o) => !o && setRemoveTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove this member?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {removeTarget?.label} will lose access to your workspace immediately. You can re-invite them later.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => removeTarget && removeMember.mutate(removeTarget.id)}
+              >
+                Remove
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </SettingsLayout>
   );
