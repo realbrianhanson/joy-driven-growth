@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { lovable } from "@/integrations/lovable/index";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 
 export default function Auth() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { signIn, signUp, signInWithMagicLink, user } = useAuth();
   const { toast } = useToast();
 
@@ -31,13 +32,38 @@ export default function Auth() {
   const [magicLinkMode, setMagicLinkMode] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [user, navigate]);
+  // Recovery flow state
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
-  if (user) return null;
+  // Safe redirect: only allow same-origin paths starting with "/"
+  const rawRedirect = searchParams.get("redirect");
+  const redirectTo =
+    rawRedirect && rawRedirect.startsWith("/") && !rawRedirect.startsWith("//")
+      ? rawRedirect
+      : "/dashboard";
+
+  // Detect Supabase password recovery (event or recovery token in URL hash)
+  useEffect(() => {
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    if (hash.includes("type=recovery")) {
+      setRecoveryMode(true);
+    }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setRecoveryMode(true);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (user && !recoveryMode) {
+      navigate(redirectTo, { replace: true });
+    }
+  }, [user, navigate, recoveryMode, redirectTo]);
+
+  if (user && !recoveryMode) return null;
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +73,7 @@ export default function Auth() {
     if (error) {
       toast({ title: "Unable to sign in", description: error.message, variant: "destructive" });
     } else {
-      navigate("/dashboard");
+      navigate(redirectTo);
     }
   };
 
@@ -78,7 +104,7 @@ export default function Auth() {
     }
     setIsResettingPassword(true);
     const { error } = await supabase.auth.resetPasswordForEmail(signInEmail, {
-      redirectTo: `${window.location.origin}/auth`,
+      redirectTo: `${window.location.origin}/login`,
     });
     setIsResettingPassword(false);
     if (error) toast({ title: "Couldn't send reset link", description: error.message, variant: "destructive" });
@@ -100,12 +126,34 @@ export default function Auth() {
   const handleGoogle = async () => {
     setIsGoogleLoading(true);
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+      redirect_uri: `${window.location.origin}${redirectTo}`,
     });
     if (result?.error) {
       toast({ title: "Unable to sign in", description: String(result.error), variant: "destructive" });
       setIsGoogleLoading(false);
     }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmNewPassword) {
+      toast({ title: "Passwords don't match", variant: "destructive" });
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast({ title: "Password must be at least 8 characters", variant: "destructive" });
+      return;
+    }
+    setIsUpdatingPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setIsUpdatingPassword(false);
+    if (error) {
+      toast({ title: "Couldn't update password", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Password updated", description: "You're all set." });
+    setRecoveryMode(false);
+    navigate("/dashboard", { replace: true });
   };
 
   return (
@@ -119,6 +167,46 @@ export default function Auth() {
           <p className="text-sm text-muted-foreground mt-1.5">Turn testimonials into revenue</p>
         </div>
 
+        {recoveryMode ? (
+          <Card>
+            <CardHeader className="pb-4">
+              <h2 className="text-lg font-semibold tracking-tight">Set a new password</h2>
+              <p className="text-sm text-muted-foreground">Choose a new password for your account.</p>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleUpdatePassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">New password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    minLength={8}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-new-password">Confirm new password</Label>
+                  <Input
+                    id="confirm-new-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    required
+                    minLength={8}
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={isUpdatingPassword}>
+                  {isUpdatingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Update password
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        ) : (
         <Card>
           <Tabs defaultValue="signin">
             <CardHeader className="pb-4">
@@ -298,6 +386,7 @@ export default function Auth() {
             </TabsContent>
           </Tabs>
         </Card>
+        )}
       </div>
     </div>
   );
