@@ -11,6 +11,7 @@ import { useSubscription } from "@/hooks/use-subscription";
 import SettingsLayout from "@/components/settings/SettingsLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { PLANS } from "@/lib/billing-plans";
+import { SALES_EMAIL } from "@/lib/config";
 
 const SettingsBilling = () => {
   const { toast } = useToast();
@@ -183,7 +184,7 @@ const SettingsBilling = () => {
                       <Button variant="outline" disabled className="w-full">Free forever</Button>
                     ) : id === "scale" ? (
                       <Button asChild variant="outline" className="w-full">
-                        <a href="mailto:hello@happyclient.io?subject=Scale%20plan%20inquiry">Contact sales</a>
+                        <a href={`mailto:${SALES_EMAIL}?subject=Scale%20plan%20inquiry`}>Contact sales</a>
                       </Button>
                     ) : (
                       <Button

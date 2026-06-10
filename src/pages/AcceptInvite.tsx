@@ -78,7 +78,7 @@ const AcceptInvite = () => {
   };
 
   const goSignIn = () => {
-    navigate(`/auth?redirect=${encodeURIComponent(`/accept-invite/${token}`)}`);
+    navigate(`/login?redirect=${encodeURIComponent(`/accept-invite/${token}`)}`);
   };
 
   return (

@@ -430,7 +430,7 @@ const Pricing = () => (
               ))}
             </ul>
             <Button asChild className="w-full" variant={tier.popular ? "default" : "outline"}>
-              <Link to="/auth">{tier.cta}</Link>
+              <Link to="/login">{tier.cta}</Link>
             </Button>
           </div>
         ))}
@@ -532,8 +532,8 @@ const TrustBar = () => (
       className="max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-8 md:gap-12"
     >
       {[
-        { icon: Shield, text: "SOC 2 Compliant" },
-        { icon: Globe, text: "GDPR Ready" },
+        { icon: Shield, text: "SSL Secured" },
+        { icon: Globe, text: "GDPR-friendly consent capture" },
         { icon: Zap, text: "99.9% Uptime" },
         { icon: CheckCircle2, text: "256-bit Encryption" },
       ].map((item) => (
@@ -586,6 +586,8 @@ const Footer = () => (
       <div className="flex items-center gap-8 text-sm text-muted-foreground">
         <a href="#how-it-works" className="hover:text-foreground transition-colors">How it works</a>
         <a href="#features" className="hover:text-foreground transition-colors">Features</a>
+        <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+        <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
         <Link to="/login" className="hover:text-foreground transition-colors">Sign In</Link>
       </div>
       <span className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} Happy Client</span>
