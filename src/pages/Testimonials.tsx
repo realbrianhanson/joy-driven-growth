@@ -1,8 +1,12 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { MessageSquare, Link2 } from "lucide-react";
+import { MessageSquare, Link2, AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog as EditDialog, DialogContent as EditDialogContent, DialogHeader as EditDialogHeader, DialogTitle as EditDialogTitle, DialogFooter as EditDialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,6 +76,10 @@ export default function Testimonials() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Testimonial | null>(null);
+  const [editForm, setEditForm] = useState({ author_name: "", author_title: "", author_company: "", content: "", rating: 5 });
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isDeveloping, setIsDeveloping] = useState(false);
   const queryClient = useQueryClient();
 
@@ -90,7 +98,7 @@ export default function Testimonials() {
   // All testimonials (unfiltered) for counts
   const { data: allDbTestimonials } = useTestimonials(undefined);
   // Filtered testimonials
-  const { data: dbTestimonials, isLoading } = useTestimonials(
+  const { data: dbTestimonials, isLoading, error: testimonialsError, refetch } = useTestimonials(
     Object.keys(hookFilters).length > 0 ? hookFilters : undefined
   );
 
@@ -105,7 +113,7 @@ export default function Testimonials() {
         .eq("user_id", user!.id)
         .eq("is_published", true)
         .limit(1)
-        .single();
+        .maybeSingle();
       return data;
     },
   });
@@ -128,6 +136,21 @@ export default function Testimonials() {
   const testimonials = isDemoMode ? MOCK_TESTIMONIALS : realTestimonials;
   const allTestimonials = isDemoMode ? MOCK_TESTIMONIALS : allRealTestimonials;
   const loading = isDemoMode ? false : isLoading;
+
+  // Deep-link: open detail by :id when present
+  useEffect(() => {
+    if (!id) return;
+    if (selectedTestimonial?.id === id) return;
+    if (allTestimonials.length === 0) return;
+    const found = allTestimonials.find((t) => t.id === id);
+    if (found) {
+      setSelectedTestimonial(found);
+      setIsDetailOpen(true);
+    } else if (!loading) {
+      toast({ title: "Testimonial not found", variant: "destructive" });
+      navigate("/dashboard/testimonials", { replace: true });
+    }
+  }, [id, allTestimonials, loading, selectedTestimonial?.id, toast, navigate]);
 
   // Filter counts from ALL testimonials (unfiltered)
   const counts = useMemo(
@@ -336,6 +359,10 @@ export default function Testimonials() {
 
   const analyzeTestimonial = async () => {
     if (!selectedTestimonial) return;
+    if (isDemoMode) {
+      toast({ title: "Switch to live data to analyze real testimonials" });
+      return;
+    }
     setIsAnalyzing(true);
     try {
       const { data, error } = await supabase.functions.invoke("analyze-testimonial", {
@@ -354,6 +381,79 @@ export default function Testimonials() {
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const openEdit = (id: string) => {
+    const t = allTestimonials.find((x) => x.id === id);
+    if (!t) return;
+    if (isDemoMode) {
+      toast({ title: "Switch to live data to edit testimonials" });
+      return;
+    }
+    setEditTarget(t);
+    setEditForm({
+      author_name: t.name ?? "",
+      author_title: t.title ?? "",
+      author_company: t.company ?? "",
+      content: t.content ?? "",
+      rating: t.rating ?? 5,
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editTarget) return;
+    setIsSavingEdit(true);
+    updateMutation.mutate(
+      {
+        id: editTarget.id,
+        author_name: editForm.author_name.trim(),
+        author_title: editForm.author_title.trim() || null,
+        author_company: editForm.author_company.trim() || null,
+        content: editForm.content,
+        rating: Number(editForm.rating) || 0,
+      },
+      {
+        onSuccess: () => {
+          toast({ title: "Testimonial updated" });
+          queryClient.invalidateQueries({ queryKey: ["testimonials"] });
+          setEditTarget(null);
+          setIsSavingEdit(false);
+        },
+        onError: (e) => {
+          toast({ title: "Failed to update", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+          setIsSavingEdit(false);
+        },
+      }
+    );
+  };
+
+  const confirmBulkDelete = () => {
+    const ids = Array.from(selectedIds);
+    setBulkDeleteOpen(false);
+    setSelectedIds(new Set());
+    if (isDemoMode) {
+      toast({ title: `Deleted ${ids.length} testimonial${ids.length !== 1 ? "s" : ""}` });
+      return;
+    }
+    let succeeded = 0;
+    let failed = 0;
+    ids.forEach((id) =>
+      deleteMutation.mutate(id, {
+        onSuccess: () => {
+          succeeded++;
+          if (succeeded + failed === ids.length) {
+            if (failed === 0) toast({ title: `Deleted ${succeeded} testimonial${succeeded !== 1 ? "s" : ""}` });
+            else toast({ title: `Deleted ${succeeded}, ${failed} failed`, variant: "destructive" });
+          }
+        },
+        onError: () => {
+          failed++;
+          if (succeeded + failed === ids.length) {
+            toast({ title: `Deleted ${succeeded}, ${failed} failed`, variant: "destructive" });
+          }
+        },
+      })
+    );
   };
 
   const copyFormLink = () => {
@@ -439,11 +539,8 @@ export default function Testimonials() {
             }}
             onBulkExport={handleBulkExport}
             onBulkDelete={() => {
-              selectedIds.forEach((id) => {
-                if (!isDemoMode) deleteMutation.mutate(id);
-              });
-              setSelectedIds(new Set());
-              toast({ title: "Testimonials deleted" });
+              if (selectedIds.size === 0) return;
+              setBulkDeleteOpen(true);
             }}
           />
         </div>
@@ -471,6 +568,15 @@ export default function Testimonials() {
               </Card>
             ))}
           </div>
+        ) : testimonialsError && !isDemoMode ? (
+          <div className="text-center py-20 border border-dashed border-destructive/30 rounded-xl">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-destructive/10 mb-4">
+              <AlertCircle className="w-5 h-5 text-destructive" />
+            </div>
+            <h3 className="text-base font-semibold text-foreground mb-1.5">Couldn't load testimonials</h3>
+            <p className="text-sm text-muted-foreground mb-5">{testimonialsError instanceof Error ? testimonialsError.message : "Something went wrong."}</p>
+            <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
+          </div>
         ) : sortedTestimonials.length > 0 ? (
           /* Grid/List */
           <div
@@ -489,7 +595,7 @@ export default function Testimonials() {
                   onClick={handleClick}
                   onApprove={handleApprove}
                   onFeature={handleFeature}
-                  onEdit={(id) => toast({ title: "Edit coming soon" })}
+                  onEdit={openEdit}
                   onDelete={handleDelete}
                 />
               </div>
@@ -526,7 +632,7 @@ export default function Testimonials() {
                 testimonial={{
                   ...selectedTestimonial,
                   transcript: selectedTestimonial.type !== "text" ? selectedTestimonial.content : undefined,
-                  verified: true,
+                  verified: !!(selectedDbRow as { consent_given?: boolean } | null)?.consent_given,
                   location: undefined,
                   developedContent: (selectedDbRow as { developed_content?: string | null } | null)?.developed_content ?? null,
                   developedPullQuote: (selectedDbRow as { developed_pull_quote?: string | null } | null)?.developed_pull_quote ?? null,
@@ -539,9 +645,6 @@ export default function Testimonials() {
                   selectedTestimonial.revenue
                     ? {
                         total: selectedTestimonial.revenue,
-                        conversions: Math.ceil(selectedTestimonial.revenue / 300),
-                        widget: "Homepage Carousel",
-                        lastConversion: "2 days ago",
                       }
                     : undefined
                 }
@@ -554,7 +657,6 @@ export default function Testimonials() {
                   handleCloseDetail();
                 }}
                 onReject={() => handleReject(selectedTestimonial.id)}
-                onRequestEdit={() => toast({ title: "Edit request sent" })}
                 onFeature={() => handleFeature(selectedTestimonial.id)}
                 onGenerateContent={handleGenerateContent}
                 onClose={handleCloseDetail}
@@ -580,6 +682,61 @@ export default function Testimonials() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Bulk delete confirmation */}
+        <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete {selectedIds.size} testimonial{selectedIds.size !== 1 ? "s" : ""}?</AlertDialogTitle>
+              <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Edit dialog */}
+        <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
+          <DialogContent className="max-w-lg">
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-base font-semibold text-foreground">Edit testimonial</h2>
+                <p className="text-xs text-muted-foreground">Update the author details, content, and rating.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="edit-name">Name</Label>
+                  <Input id="edit-name" value={editForm.author_name} onChange={(e) => setEditForm((f) => ({ ...f, author_name: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-title">Title</Label>
+                  <Input id="edit-title" value={editForm.author_title} onChange={(e) => setEditForm((f) => ({ ...f, author_title: e.target.value }))} />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="edit-company">Company</Label>
+                <Input id="edit-company" value={editForm.author_company} onChange={(e) => setEditForm((f) => ({ ...f, author_company: e.target.value }))} />
+              </div>
+              <div>
+                <Label htmlFor="edit-content">Content</Label>
+                <Textarea id="edit-content" rows={5} value={editForm.content} onChange={(e) => setEditForm((f) => ({ ...f, content: e.target.value }))} />
+              </div>
+              <div>
+                <Label htmlFor="edit-rating">Rating (0–5)</Label>
+                <Input id="edit-rating" type="number" min={0} max={5} step={1} value={editForm.rating} onChange={(e) => setEditForm((f) => ({ ...f, rating: Number(e.target.value) }))} />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setEditTarget(null)} disabled={isSavingEdit}>Cancel</Button>
+                <Button onClick={saveEdit} disabled={isSavingEdit || !editForm.author_name.trim() || !editForm.content.trim()}>
+                  {isSavingEdit && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                  Save changes
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
