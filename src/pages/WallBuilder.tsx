@@ -18,6 +18,7 @@ import { Slider } from "@/components/ui/slider";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -77,12 +78,13 @@ const WallBuilder = () => {
   });
 
   // Fetch existing wall
-  const { data: existingWall } = useQuery({
+  const { data: existingWall, isLoading: loadingWall, error: wallError, refetch: refetchWall } = useQuery({
     queryKey: ['wall', id],
     queryFn: async () => {
       if (isNew) return null;
-      const { data, error } = await supabase.from('walls').select('*').eq('id', id).single();
+      const { data, error } = await supabase.from('walls').select('*').eq('id', id).maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error("Wall not found");
       return data;
     },
     enabled: !isNew,
@@ -131,7 +133,15 @@ const WallBuilder = () => {
   };
 
   const publicUrl = `${window.location.origin}/wall/${slug}`;
-  const copyLink = () => { navigator.clipboard.writeText(publicUrl); toast.success('Link copied!'); };
+  const canShare = !isNew && slug.trim().length > 0 && !!existingWall;
+  const copyLink = () => {
+    if (!canShare) {
+      toast.error("Save the wall first to share its link.");
+      return;
+    }
+    navigator.clipboard.writeText(publicUrl);
+    toast.success('Link copied!');
+  };
 
   const handleSave = async () => {
     if (!workspaceOwnerId || !wallName.trim() || !slug.trim()) {
@@ -195,7 +205,7 @@ const WallBuilder = () => {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-8" onClick={copyLink}><Share2 className="w-3.5 h-3.5 mr-1.5" />Share</Button>
+            <Button variant="outline" size="sm" className="h-8" onClick={copyLink} disabled={!canShare}><Share2 className="w-3.5 h-3.5 mr-1.5" />Share</Button>
             <Button size="sm" className="h-8" onClick={handleSave} disabled={isSaving}>
               {isSaving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
               {isNew ? 'Create' : 'Save'}
@@ -224,7 +234,7 @@ const WallBuilder = () => {
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-sm text-muted-foreground shrink-0">/wall/</span>
                         <Input value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''))} placeholder="my-wall" className="flex-1" />
-                        <Button variant="outline" size="sm" onClick={copyLink}><Copy className="w-4 h-4" /></Button>
+                        <Button variant="outline" size="sm" onClick={copyLink} disabled={!canShare}><Copy className="w-4 h-4" /></Button>
                       </div>
                       {checkingSlug && <p className="text-xs text-muted-foreground mt-1">Checking availability…</p>}
                       {slugTaken && <p className="text-xs text-destructive mt-1">This URL is taken — try a different one.</p>}
@@ -376,7 +386,7 @@ const WallBuilder = () => {
                     layout === 'list' ? 'grid-cols-1' :
                     device === 'mobile' ? 'grid-cols-1' :
                     device === 'tablet' ? 'grid-cols-1 sm:grid-cols-2' :
-                    (colClassMap[Math.min(columns[0], 3)] ?? colClassMap[3])
+                    (colClassMap[columns[0]] ?? colClassMap[3])
                   }`}>
                     {selectedData.length === 0 ? (
                       <div className="col-span-full text-center py-16 text-muted-foreground">
