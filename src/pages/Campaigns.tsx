@@ -1,11 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Send, TrendingUp, MessageSquare, Users, Megaphone } from "lucide-react";
+import { Plus, Send, TrendingUp, MessageSquare, Users, Megaphone, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -21,14 +22,22 @@ import { useWorkspace } from "@/hooks/use-workspace";
 import { useDemoMode } from "@/contexts/DemoModeContext";
 import { MOCK_CAMPAIGNS } from "@/data/mock/campaigns";
 
+const PLAN_SMS_LIMITS: Record<string, number | null> = {
+  free: 0,
+  starter: 100,
+  pro: 500,
+  scale: null, // unlimited
+};
+
 export default function Campaigns() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { workspaceOwnerId } = useWorkspace();
   const { isDemoMode } = useDemoMode();
   const queryClient = useQueryClient();
+  const [detailCampaign, setDetailCampaign] = useState<any | null>(null);
 
-  const { data: realCampaigns, isLoading } = useQuery({
+  const { data: realCampaigns, isLoading, error: campaignsError, refetch } = useQuery({
     queryKey: ["campaigns", workspaceOwnerId],
     queryFn: async () => {
       if (!workspaceOwnerId) return [];
@@ -41,6 +50,53 @@ export default function Campaigns() {
       return data;
     },
     enabled: !!workspaceOwnerId && !isDemoMode,
+  });
+
+  // Plan
+  const { data: plan } = useQuery({
+    queryKey: ["user-plan", workspaceOwnerId],
+    enabled: !!workspaceOwnerId && !isDemoMode,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_user_plan", { p_user_id: workspaceOwnerId! });
+      if (error) throw error;
+      return (data as string) || "free";
+    },
+  });
+
+  // SMS sent this month (count of sent campaign_jobs created this month)
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+  const { data: monthlySent = 0 } = useQuery({
+    queryKey: ["sms-sent-month", workspaceOwnerId, monthStart],
+    enabled: !!workspaceOwnerId && !isDemoMode,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("campaign_jobs")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", workspaceOwnerId!)
+        .in("status", ["sent", "delivered", "failed", "undelivered"])
+        .gte("created_at", monthStart);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
+  // Detail: jobs status counts
+  const { data: detailJobs } = useQuery({
+    queryKey: ["campaign-job-stats", detailCampaign?.id],
+    enabled: !!detailCampaign && !isDemoMode,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("campaign_jobs")
+        .select("status")
+        .eq("campaign_id", detailCampaign!.id);
+      if (error) throw error;
+      const counts: Record<string, number> = {};
+      for (const r of data ?? []) {
+        const s = (r as any).status ?? "pending";
+        counts[s] = (counts[s] ?? 0) + 1;
+      }
+      return counts;
+    },
   });
 
   useEffect(() => {
@@ -59,8 +115,12 @@ export default function Campaigns() {
   const loading = isDemoMode ? false : isLoading;
   const campaigns = isDemoMode ? MOCK_CAMPAIGNS : (realCampaigns ?? []);
 
-  const totalSent = campaigns.reduce((sum, c) => sum + (c.sent_count ?? 0), 0);
-  const monthlyLimit = 500;
+  const totalSentThisMonth = isDemoMode
+    ? campaigns.reduce((sum, c) => sum + (c.sent_count ?? 0), 0)
+    : monthlySent;
+  const planKey = (plan ?? "free").toLowerCase();
+  const monthlyLimit = isDemoMode ? 500 : PLAN_SMS_LIMITS[planKey] ?? 0;
+  const isUnlimited = !isDemoMode && monthlyLimit === null;
 
   const campaignsWithSent = campaigns.filter((c) => (c.sent_count ?? 0) > 0);
   const avgResponseRate = campaignsWithSent.length > 0
@@ -138,10 +198,15 @@ export default function Campaigns() {
                     <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">SMS sent this month</span>
                   </div>
                   <div className="flex items-baseline gap-1.5 mb-3">
-                    <span className="text-2xl font-semibold text-foreground tabular-nums">{totalSent}</span>
-                    <span className="text-sm text-muted-foreground tabular-nums">/ {monthlyLimit}</span>
+                    <span className="text-2xl font-semibold text-foreground tabular-nums">{totalSentThisMonth}</span>
+                    <span className="text-sm text-muted-foreground tabular-nums">
+                      / {isUnlimited ? "Unlimited" : (monthlyLimit ?? 0)}
+                    </span>
                   </div>
-                  <Progress value={(totalSent / monthlyLimit) * 100} className="h-1" />
+                  <Progress
+                    value={isUnlimited || !monthlyLimit ? 0 : Math.min(100, (totalSentThisMonth / monthlyLimit) * 100)}
+                    className="h-1"
+                  />
                 </CardContent>
               </Card>
 
@@ -208,8 +273,12 @@ export default function Campaigns() {
                       status === "scheduled" ? "bg-warning" :
                       status === "paused" ? "bg-muted-foreground/60" :
                       "bg-muted-foreground/40";
-                    return (
-                      <TableRow key={campaign.id} className="cursor-pointer hover:bg-muted/50">
+                     return (
+                      <TableRow
+                        key={campaign.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => setDetailCampaign(campaign)}
+                      >
                         <TableCell>
                           <div>
                             <div className="font-medium text-foreground">{campaign.name}</div>
@@ -255,6 +324,65 @@ export default function Campaigns() {
             </Card>
           </>
         )}
+
+        {campaignsError && !isDemoMode && (
+          <div className="text-center py-16 border border-dashed border-destructive/30 rounded-xl mt-6">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-destructive/10 mb-4">
+              <AlertCircle className="w-5 h-5 text-destructive" />
+            </div>
+            <h3 className="text-base font-semibold text-foreground mb-1.5">Couldn't load campaigns</h3>
+            <p className="text-sm text-muted-foreground mb-5">{campaignsError instanceof Error ? campaignsError.message : "Something went wrong."}</p>
+            <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
+          </div>
+        )}
+
+        <Dialog open={!!detailCampaign} onOpenChange={(open) => !open && setDetailCampaign(null)}>
+          <DialogContent className="max-w-md">
+            {detailCampaign && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-base">{detailCampaign.name}</DialogTitle>
+                  <DialogDescription>
+                    {formatDate(detailCampaign.created_at)} · {detailCampaign.status ?? "draft"}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3 mt-2">
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="rounded-lg border border-border p-3">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Recipients</div>
+                      <div className="text-lg font-semibold tabular-nums mt-1">{detailCampaign.total_recipients ?? 0}</div>
+                    </div>
+                    <div className="rounded-lg border border-border p-3">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Delivered</div>
+                      <div className="text-lg font-semibold tabular-nums mt-1">{detailCampaign.delivered_count ?? 0}</div>
+                    </div>
+                    <div className="rounded-lg border border-border p-3">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Completed</div>
+                      <div className="text-lg font-semibold tabular-nums mt-1">{detailCampaign.completed_count ?? 0}</div>
+                    </div>
+                  </div>
+                  {!isDemoMode && (
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Job statuses</div>
+                      {detailJobs && Object.keys(detailJobs).length > 0 ? (
+                        <div className="grid grid-cols-2 gap-2">
+                          {Object.entries(detailJobs).map(([status, count]) => (
+                            <div key={status} className="flex items-center justify-between text-sm border border-border rounded-md px-3 py-1.5">
+                              <span className="text-muted-foreground capitalize">{status}</span>
+                              <span className="tabular-nums font-medium">{count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No jobs yet.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
