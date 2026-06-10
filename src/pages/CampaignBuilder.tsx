@@ -14,6 +14,9 @@ import { useForms } from "@/hooks/use-forms";
 import { useAuth } from "@/hooks/use-auth";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { supabase } from "@/integrations/supabase/client";
+import { useDemoMode } from "@/contexts/DemoModeContext";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 const steps = [
   { id: 1, title: "Setup", icon: Check },
@@ -23,6 +26,7 @@ const steps = [
 ];
 
 const SMS_CHAR_LIMIT = 160;
+const SMS_HARD_LIMIT = 320;
 
 function parseRecipients(text: string): { phone: string; first_name: string }[] {
   return text
@@ -43,7 +47,9 @@ export default function CampaignBuilder() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { workspaceOwnerId } = useWorkspace();
-  const { data: forms } = useForms();
+  const { data: forms, isLoading: formsLoading } = useForms();
+  const { isDemoMode } = useDemoMode();
+  const [demoBlockOpen, setDemoBlockOpen] = useState(false);
 
   const [currentStep, setCurrentStep] = useState(1);
 
