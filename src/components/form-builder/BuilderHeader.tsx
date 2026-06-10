@@ -10,9 +10,10 @@ interface Props {
   onPreview: () => void;
   onSave: () => void;
   isSaving: boolean;
+  saveDisabled?: boolean;
 }
 
-export function BuilderHeader({ settings, setSettings, onBack, onPreview, onSave, isSaving }: Props) {
+export function BuilderHeader({ settings, setSettings, onBack, onPreview, onSave, isSaving, saveDisabled }: Props) {
   return (
     <div className="border-b border-border bg-card sticky top-0 z-50">
       <div className="max-w-[1800px] mx-auto px-6 py-3 flex items-center justify-between">
@@ -43,7 +44,7 @@ export function BuilderHeader({ settings, setSettings, onBack, onPreview, onSave
           <Button variant="outline" size="sm" className="h-8" onClick={onPreview}>
             Preview
           </Button>
-          <Button size="sm" className="h-8" onClick={onSave} disabled={isSaving}>
+          <Button size="sm" className="h-8" onClick={onSave} disabled={isSaving || saveDisabled}>
             {isSaving && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
             Save
           </Button>

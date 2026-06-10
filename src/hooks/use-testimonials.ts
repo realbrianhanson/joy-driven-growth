@@ -37,7 +37,15 @@ export const useTestimonials = (filters?: {
         query = query.eq("rating", filters.rating);
       }
       if (filters?.search) {
-        query = query.or(`content.ilike.%${filters.search}%,author_name.ilike.%${filters.search}%`);
+        // Sanitize: PostgREST .or() uses , ( ) as syntax; % and _ are ilike wildcards. Escape them.
+        const safe = filters.search
+          .replace(/[\\,()*]/g, " ")
+          .replace(/%/g, "\\%")
+          .replace(/_/g, "\\_")
+          .trim();
+        if (safe) {
+          query = query.or(`content.ilike.%${safe}%,author_name.ilike.%${safe}%`);
+        }
       }
 
       const { data, error } = await query;

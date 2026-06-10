@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Users, MessageSquare, Calendar, Send, Check, Loader2, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,9 @@ import { useForms } from "@/hooks/use-forms";
 import { useAuth } from "@/hooks/use-auth";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { supabase } from "@/integrations/supabase/client";
+import { useDemoMode } from "@/contexts/DemoModeContext";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 const steps = [
   { id: 1, title: "Setup", icon: Check },
@@ -23,6 +26,7 @@ const steps = [
 ];
 
 const SMS_CHAR_LIMIT = 160;
+const SMS_HARD_LIMIT = 320;
 
 function parseRecipients(text: string): { phone: string; first_name: string }[] {
   return text
@@ -43,7 +47,9 @@ export default function CampaignBuilder() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { workspaceOwnerId } = useWorkspace();
-  const { data: forms } = useForms();
+  const { data: forms, isLoading: formsLoading } = useForms();
+  const { isDemoMode } = useDemoMode();
+  const [demoBlockOpen, setDemoBlockOpen] = useState(false);
 
   const [currentStep, setCurrentStep] = useState(1);
 
@@ -81,15 +87,25 @@ export default function CampaignBuilder() {
     setMessage((prev) => prev + v);
   };
 
-  const canProceed = () => {
-    switch (currentStep) {
+  const estimatedLength = useMemo(() => previewMessage.length, [previewMessage]);
+  const overHardLimit = estimatedLength > SMS_HARD_LIMIT;
+
+  const isStepValid = (step: number) => {
+    switch (step) {
       case 1: return campaignName.trim().length > 0 && selectedFormId.length > 0;
-      case 2: return message.trim().length > 0;
+      case 2: return message.trim().length > 0 && !overHardLimit;
       case 3: return validRecipients.length > 0;
       case 4: return timing === "now" || (timing === "scheduled" && scheduledDate.length > 0);
       default: return true;
     }
   };
+  const canProceed = () => isStepValid(currentStep);
+  const canJumpTo = (target: number) => {
+    if (target <= currentStep) return true;
+    for (let s = 1; s < target; s++) if (!isStepValid(s)) return false;
+    return true;
+  };
+  const allValid = isStepValid(1) && isStepValid(2) && isStepValid(3) && isStepValid(4);
 
   const saveCampaign = async (status: "draft" | "active" | "scheduled") => {
     if (!workspaceOwnerId) return null;
@@ -113,6 +129,7 @@ export default function CampaignBuilder() {
   };
 
   const handleSaveDraft = async () => {
+    if (isDemoMode) { setDemoBlockOpen(true); return; }
     if (!workspaceOwnerId) {
       toast({ title: "Workspace not ready", variant: "destructive" });
       return;
@@ -130,8 +147,13 @@ export default function CampaignBuilder() {
   };
 
   const handleSend = async () => {
+    if (isDemoMode) { setDemoBlockOpen(true); return; }
     if (!workspaceOwnerId) {
       toast({ title: "Workspace not ready", variant: "destructive" });
+      return;
+    }
+    if (!allValid || overHardLimit) {
+      toast({ title: "Complete every step and trim message under 320 chars.", variant: "destructive" });
       return;
     }
     setIsSending(true);
@@ -201,12 +223,16 @@ export default function CampaignBuilder() {
           {steps.map((step, index) => (
             <div key={step.id} className="flex items-center">
               <button
-                onClick={() => setCurrentStep(step.id)}
+                onClick={() => {
+                  if (canJumpTo(step.id)) setCurrentStep(step.id);
+                  else toast({ title: "Complete the current step first." });
+                }}
+                disabled={!canJumpTo(step.id)}
                 className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors ${
                   currentStep >= step.id
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground"
-                }`}
+                } ${!canJumpTo(step.id) ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 <step.icon className="w-5 h-5" />
               </button>
@@ -262,7 +288,8 @@ export default function CampaignBuilder() {
                     <Label>Linked Form</Label>
                     <p className="text-sm text-muted-foreground mb-2">Which form should recipients complete?</p>
                     <div className="space-y-2">
-                      {(forms ?? []).map((form) => (
+                      {formsLoading && [1,2].map(i => <Skeleton key={i} className="h-16 w-full" />)}
+                      {!formsLoading && (forms ?? []).map((form) => (
                         <Card
                           key={form.id}
                           onClick={() => setSelectedFormId(form.id)}
@@ -285,7 +312,7 @@ export default function CampaignBuilder() {
                           </CardContent>
                         </Card>
                       ))}
-                      {(forms ?? []).length === 0 && (
+                      {!formsLoading && (forms ?? []).length === 0 && (
                         <p className="text-sm text-muted-foreground py-4 text-center">
                           No forms yet.{" "}
                           <button className="text-primary underline" onClick={() => navigate("/dashboard/forms/new/edit")}>
@@ -300,7 +327,7 @@ export default function CampaignBuilder() {
                     <Label>Campaign Type</Label>
                     <div className="flex gap-3 mt-1">
                       <Badge className="bg-primary text-primary-foreground">SMS</Badge>
-                      <Badge variant="outline" className="text-muted-foreground">Email <span className="text-xs ml-1 opacity-60">coming soon</span></Badge>
+                      <Badge variant="outline" className="text-muted-foreground opacity-60">Email <span className="text-xs ml-1">SMS only for now</span></Badge>
                     </div>
                   </div>
                 </div>
@@ -318,17 +345,20 @@ export default function CampaignBuilder() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <Label>Message</Label>
-                    <span className={`text-sm ${message.length > SMS_CHAR_LIMIT ? "text-destructive font-medium" : "text-muted-foreground"}`}>
-                      {message.length}/{SMS_CHAR_LIMIT}
+                    <span className={`text-sm tabular-nums ${overHardLimit ? "text-destructive font-medium" : estimatedLength > SMS_CHAR_LIMIT ? "text-warning font-medium" : "text-muted-foreground"}`}>
+                      {estimatedLength}/{SMS_HARD_LIMIT}{selectedForm ? "" : " (pick a form for accurate count)"}
                     </span>
                   </div>
                   <Textarea
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     rows={4}
-                    maxLength={SMS_CHAR_LIMIT * 2}
+                    maxLength={500}
                     className="resize-none"
                   />
+                  {overHardLimit && (
+                    <p className="text-xs text-destructive mt-2">Expands past {SMS_HARD_LIMIT} chars with the link. Shorten before sending.</p>
+                  )}
                   <div className="flex gap-2 mt-2">
                     <Button variant="outline" size="sm" onClick={() => insertVariable("{first_name}")}>
                       + {"{first_name}"}
@@ -472,7 +502,7 @@ export default function CampaignBuilder() {
                   Next <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               ) : (
-                <Button onClick={handleSend} disabled={!canProceed() || isSending}>
+                <Button onClick={handleSend} disabled={!allValid || isSending || overHardLimit}>
                   {isSending ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
@@ -485,6 +515,20 @@ export default function CampaignBuilder() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={demoBlockOpen} onOpenChange={setDemoBlockOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Demo mode is on</DialogTitle>
+            <DialogDescription>
+              You're previewing with mock data. Switch off Demo Mode to send a real campaign — we won't write anything while demo is on.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDemoBlockOpen(false)}>Got it</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

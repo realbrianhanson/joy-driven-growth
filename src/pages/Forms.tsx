@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Copy, ExternalLink, MoreHorizontal, Pencil, Trash2, FileText, Sparkles, Video, Mic, Type } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, Copy, ExternalLink, MoreHorizontal, Pencil, Trash2, FileText, Sparkles, Video, Mic, Type, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,17 +25,42 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useDemoMode } from "@/contexts/DemoModeContext";
 import { useForms, useDeleteForm } from "@/hooks/use-forms";
+import { useWorkspace } from "@/hooks/use-workspace";
+import { supabase } from "@/integrations/supabase/client";
 import { MOCK_FORMS } from "@/data/mock/forms";
 
 export default function Forms() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isDemoMode } = useDemoMode();
-  const { data: realForms, isLoading } = useForms();
+  const { workspaceOwnerId } = useWorkspace();
+  const { data: realForms, isLoading, error: formsError, refetch } = useForms();
   const deleteMutation = useDeleteForm();
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const loading = isDemoMode ? false : isLoading;
+
+  // Latest testimonial per form (one cheap query, grouped client-side)
+  const formIds = (realForms ?? []).map((f) => f.id);
+  const { data: latestByForm } = useQuery({
+    queryKey: ["forms-latest-response", workspaceOwnerId, formIds.join(",")],
+    enabled: !isDemoMode && !!workspaceOwnerId && formIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("testimonials")
+        .select("form_id, created_at")
+        .eq("user_id", workspaceOwnerId!)
+        .in("form_id", formIds)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      for (const row of data ?? []) {
+        const fid = (row as any).form_id as string | null;
+        if (fid && !map[fid]) map[fid] = (row as any).created_at as string;
+      }
+      return map;
+    },
+  });
 
   // Map DB forms to display shape
   const mapForm = (f: any) => ({
@@ -49,7 +75,7 @@ export default function Forms() {
         ],
         responses: f.submission_count ?? 0,
         aiInterview: !!(f.custom_questions as any)?.ai_enabled,
-        lastResponse: undefined as string | undefined,
+        lastResponse: isDemoMode ? undefined : latestByForm?.[f.id],
         primaryColor: f.primary_color ?? "#6366F1",
         createdAt: f.created_at,
   });
@@ -135,6 +161,15 @@ export default function Forms() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        ) : formsError && !isDemoMode ? (
+          <div className="text-center py-24 border border-dashed border-destructive/30 rounded-xl">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-destructive/10 mb-4">
+              <AlertCircle className="w-5 h-5 text-destructive" />
+            </div>
+            <h3 className="text-base font-semibold text-foreground mb-1.5">Couldn't load your forms</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-5">{formsError instanceof Error ? formsError.message : "Something went wrong."}</p>
+            <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
           </div>
         ) : forms.length === 0 ? (
           /* Empty state */

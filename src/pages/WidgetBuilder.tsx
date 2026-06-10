@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -58,12 +59,13 @@ const WidgetBuilder = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   // Fetch existing widget if editing
-  const { data: existingWidget } = useQuery({
+  const { data: existingWidget, isLoading: loadingWidget, error: widgetError, refetch: refetchWidget } = useQuery({
     queryKey: ['widget', id],
     queryFn: async () => {
       if (isNew) return null;
-      const { data, error } = await supabase.from('widgets').select('*').eq('id', id).single();
+      const { data, error } = await supabase.from('widgets').select('*').eq('id', id).maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error("Widget not found");
       return data;
     },
     enabled: !isNew,
@@ -158,6 +160,35 @@ const WidgetBuilder = () => {
 
   const isFomo = widgetType === 'fomo' || widgetType === 'popup';
   const selectedData = testimonials.filter(t => selectedTestimonials.includes(t.id));
+
+  if (!isNew && loadingWidget) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="space-y-3 w-full max-w-md">
+          <Skeleton className="h-8 w-48 mx-auto" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!isNew && widgetError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="text-center max-w-md">
+          <div className="w-12 h-12 rounded-xl bg-destructive/10 mx-auto mb-4 flex items-center justify-center">
+            <AlertCircle className="w-6 h-6 text-destructive" />
+          </div>
+          <h1 className="text-lg font-semibold text-foreground mb-1">Couldn't load this widget</h1>
+          <p className="text-sm text-muted-foreground mb-5">{widgetError instanceof Error ? widgetError.message : "Something went wrong."}</p>
+          <div className="flex gap-2 justify-center">
+            <Link to="/dashboard/widgets"><Button variant="outline">Back</Button></Link>
+            <Button onClick={() => refetchWidget()}>Retry</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

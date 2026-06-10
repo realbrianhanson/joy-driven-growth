@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useForm as useFormData, useCreateForm, useUpdateForm } from "@/hooks/use-forms";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,7 +27,7 @@ export default function FormBuilder() {
   const { toast } = useToast();
   const isNew = !id || id === "new";
 
-  const { data: existingForm, isLoading: formLoading } = useFormData(isNew ? "" : (id ?? ""));
+  const { data: existingForm, isLoading: formLoading, error: formError, refetch: refetchForm } = useFormData(isNew ? "" : (id ?? ""));
   const createMutation = useCreateForm();
   const updateMutation = useUpdateForm();
 
@@ -113,6 +115,25 @@ export default function FormBuilder() {
       toast({ title: "That URL is already taken. Please pick a different slug.", variant: "destructive" });
       return;
     }
+    if (!isNew && (!initialized || formError)) {
+      toast({ title: "Form hasn't loaded yet — can't save.", variant: "destructive" });
+      return;
+    }
+    if (
+      settings.reviewRoutingEnabled &&
+      typeof settings.negativeAction === "string" &&
+      settings.negativeAction.trim().length > 0
+    ) {
+      const trimmed = settings.negativeAction.trim();
+      if (trimmed === "support@example.com") {
+        toast({ title: "Please enter a real notification email (not the placeholder).", variant: "destructive" });
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+        toast({ title: "Please enter a valid notification email for negative reviews.", variant: "destructive" });
+        return;
+      }
+    }
     const formData = {
       name: settings.name,
       slug: settings.slug,
@@ -194,6 +215,26 @@ export default function FormBuilder() {
     );
   }
 
+  if (!isNew && formError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="text-center max-w-md">
+          <div className="w-12 h-12 rounded-xl bg-destructive/10 mx-auto mb-4 flex items-center justify-center">
+            <AlertCircle className="w-6 h-6 text-destructive" />
+          </div>
+          <h1 className="text-lg font-semibold text-foreground mb-1">Couldn't load this form</h1>
+          <p className="text-sm text-muted-foreground mb-5">
+            We didn't want to overwrite your live form with defaults, so saving is blocked. Try again or head back.
+          </p>
+          <div className="flex gap-2 justify-center">
+            <Button variant="outline" onClick={() => navigate("/dashboard/forms")}>Back</Button>
+            <Button onClick={() => refetchForm()}>Retry</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (isNew && showTemplatePicker) {
     return (
       <TemplatePicker
@@ -250,6 +291,7 @@ export default function FormBuilder() {
         onPreview={() => window.open(`/collect/${settings.slug}`, "_blank")}
         onSave={handleSave}
         isSaving={isSaving}
+        saveDisabled={!isNew && !initialized}
       />
 
       <div className="max-w-[1600px] mx-auto p-4 md:p-6">
