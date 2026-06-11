@@ -11,9 +11,21 @@ serve(async (req) => {
 
   try {
     const internalKey = req.headers.get("x-internal-key");
-    const workerKey = Deno.env.get("INTERNAL_WORKER_KEY");
     const authHeader = req.headers.get("Authorization");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey!);
+
+    let workerKey = Deno.env.get("INTERNAL_WORKER_KEY");
+    if (!workerKey) {
+      const { data: settingRow } = await supabaseAdmin
+        .from("app_settings")
+        .select("value")
+        .eq("key", "internal_worker_key")
+        .maybeSingle();
+      workerKey = (settingRow as { value?: string } | null)?.value ?? undefined;
+    }
+
     const hasServiceAuth = authHeader === `Bearer ${serviceKey}`;
     const hasInternalKey = workerKey && internalKey === workerKey;
     if (!hasInternalKey && !hasServiceAuth) {
@@ -31,8 +43,7 @@ serve(async (req) => {
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabase = createClient(supabaseUrl, serviceKey!);
+    const supabase = supabaseAdmin;
 
     const { data: jobs, error: claimError } = await supabase.rpc("claim_pending_jobs", { p_limit: 50 });
     if (claimError) {

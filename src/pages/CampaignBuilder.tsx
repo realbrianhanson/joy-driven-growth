@@ -178,17 +178,11 @@ export default function CampaignBuilder() {
         if (jobsError) throw jobsError;
       }
 
-      if (!isScheduled) {
-        supabase.functions.invoke("process-campaign-jobs", { body: {} }).catch((e) => {
-          console.warn("Worker kick failed (will retry via cron):", e);
-        });
-      }
-
       toast({
-        title: isScheduled ? "Campaign scheduled" : "Campaign queued",
+        title: isScheduled ? "Campaign scheduled" : "Campaign queued — sending shortly",
         description: isScheduled
           ? `Will send to ${jobs.length} recipients on ${new Date(scheduledDate).toLocaleString()}.`
-          : `Queued ${jobs.length} messages. Delivery typically completes within a minute.`,
+          : `Queued ${jobs.length} messages. Delivery completes within a minute.`,
       });
       navigate("/dashboard/campaigns");
     } catch (e: any) {

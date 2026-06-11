@@ -65,11 +65,24 @@ const Analytics = () => {
   const formatNumber = (num: number) => (num >= 1000 ? (num / 1000).toFixed(1) + "k" : num.toString());
 
   const handleExportCsv = async () => {
+    if (isDemoMode) {
+      toast("Export disabled in demo mode", { description: "Turn off Demo Mode to export your real data." });
+      return;
+    }
     if (!workspaceOwnerId) return;
+    const rangeStart = (() => {
+      const d = new Date();
+      if (dateRange === "today") d.setHours(0, 0, 0, 0);
+      else if (dateRange === "7d") d.setDate(d.getDate() - 7);
+      else if (dateRange === "30d") d.setDate(d.getDate() - 30);
+      else if (dateRange === "90d") d.setDate(d.getDate() - 90);
+      return d.toISOString();
+    })();
     const { data, error } = await supabase
       .from("testimonials")
       .select("created_at, author_name, author_email, author_company, content, rating, type, status, source, revenue_attributed")
       .eq("user_id", workspaceOwnerId)
+      .gte("created_at", rangeStart)
       .order("created_at", { ascending: false });
     if (error) {
       toast.error("Export failed", { description: error.message });
@@ -475,7 +488,7 @@ const Analytics = () => {
                   </TableHeader>
                   <TableBody>
                     {widgetTableData.map((widget) => (
-                      <TableRow key={widget.id} className="cursor-pointer hover:bg-secondary/50">
+                      <TableRow key={widget.id}>
                         <TableCell className="font-medium">{widget.name}</TableCell>
                         <TableCell><span className="text-xs uppercase tracking-wider font-medium text-muted-foreground">{widget.type}</span></TableCell>
                         <TableCell className="text-right tabular-nums">{formatNumber(widget.impressions)}</TableCell>
@@ -539,7 +552,7 @@ const Analytics = () => {
               {topPerformersList.length > 0 ? (
                 <div className="space-y-1">
                   {topPerformersList.map((performer) => (
-                    <div key={performer.rank} className="flex items-center justify-between py-1.5 hover:bg-muted/40 -mx-2 px-2 rounded-md transition-colors cursor-pointer">
+                    <div key={performer.rank} className="flex items-center justify-between py-1.5 -mx-2 px-2 rounded-md">
                       <div className="flex items-center gap-3 min-w-0">
                         <span className="text-xs font-medium tabular-nums text-muted-foreground w-4">{performer.rank}</span>
                         <div className="min-w-0">
@@ -557,15 +570,6 @@ const Analytics = () => {
             </CardContent>
           </Card>
         </div>
-
-        {/* ============ INSIGHTS ============ */}
-        <Card className="bg-card border border-border rounded-xl shadow-none mb-3">
-          <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">
-              AI-generated insights appear here as you collect more testimonials. We need at least 10 approved testimonials with revenue attribution to surface trends.
-            </p>
-          </CardContent>
-        </Card>
 
         {/* ============ EXPORT OPTIONS ============ */}
         <Card className="bg-card border border-border rounded-xl shadow-none">

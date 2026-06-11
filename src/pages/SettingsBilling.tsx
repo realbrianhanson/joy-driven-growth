@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useSubscription } from "@/hooks/use-subscription";
+import { useWorkspace } from "@/hooks/use-workspace";
 import SettingsLayout from "@/components/settings/SettingsLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { PLANS } from "@/lib/billing-plans";
@@ -16,18 +17,18 @@ import { SALES_EMAIL } from "@/lib/config";
 const SettingsBilling = () => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { workspaceOwnerId } = useWorkspace();
   const subscription = useSubscription();
-  const [stripeNotConfigured, setStripeNotConfigured] = useState(false);
   const [checkingOut, setCheckingOut] = useState<string | null>(null);
   const [openingPortal, setOpeningPortal] = useState(false);
 
   const { data: usage, isLoading: usageLoading } = useQuery({
-    queryKey: ["billing-usage", user?.id],
-    enabled: !!user,
+    queryKey: ["billing-usage", workspaceOwnerId],
+    enabled: !!workspaceOwnerId,
     queryFn: async () => {
       const [t, w] = await Promise.all([
-        supabase.from("testimonials").select("id", { count: "exact", head: true }).eq("user_id", user!.id),
-        supabase.from("widgets").select("id", { count: "exact", head: true }).eq("user_id", user!.id),
+        supabase.from("testimonials").select("id", { count: "exact", head: true }).eq("user_id", workspaceOwnerId!),
+        supabase.from("widgets").select("id", { count: "exact", head: true }).eq("user_id", workspaceOwnerId!),
       ]);
       return { testimonials: t.count ?? 0, widgets: w.count ?? 0 };
     },
@@ -36,8 +37,8 @@ const SettingsBilling = () => {
   const startCheckout = async (priceId: string | null, planName: string) => {
     if (!priceId || priceId.startsWith("price_REPLACE_ME")) {
       toast({
-        title: "Plan not yet configured",
-        description: "Set the Stripe price ID for this plan in src/lib/billing-plans.ts to enable.",
+        title: "Upgrades aren't available yet",
+        description: `Email ${SALES_EMAIL} and we'll get you set up.`,
         variant: "destructive",
       });
       return;
@@ -50,8 +51,11 @@ const SettingsBilling = () => {
       if (error) throw error;
       const payload = data as { url?: string; error?: string };
       if (payload?.error) {
-        if (payload.error.toLowerCase().includes("not configured")) setStripeNotConfigured(true);
-        toast({ title: "Couldn't start checkout", description: payload.error, variant: "destructive" });
+        toast({
+          title: "Upgrades aren't available yet",
+          description: `Email ${SALES_EMAIL} and we'll help you upgrade.`,
+          variant: "destructive",
+        });
         return;
       }
       if (payload?.url) window.location.href = payload.url;
@@ -85,15 +89,18 @@ const SettingsBilling = () => {
     ? new Date(subscription.currentPeriodEnd).toLocaleDateString()
     : null;
 
+  const upgradesEnabled = !!(PLANS.starter.priceId && !PLANS.starter.priceId.startsWith("price_REPLACE_ME"));
+
   return (
     <SettingsLayout>
-      {stripeNotConfigured && (
+      {!upgradesEnabled && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 mb-6 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
           <div>
-            <h3 className="font-semibold text-foreground">Billing is built but not yet connected</h3>
+            <h3 className="font-semibold text-foreground">Upgrades aren't available yet</h3>
             <p className="text-sm text-muted-foreground mt-1">
-              To enable real upgrades, set <code className="text-xs">STRIPE_SECRET_KEY</code>, <code className="text-xs">STRIPE_WEBHOOK_SECRET</code>, <code className="text-xs">STRIPE_PRICE_STARTER</code>, and <code className="text-xs">STRIPE_PRICE_PRO</code> in Supabase Edge Function secrets, and replace the placeholder price IDs in <code className="text-xs">src/lib/billing-plans.ts</code>. See the README for full setup.
+              Self-serve checkout is coming soon. Want to upgrade now? Email{" "}
+              <a href={`mailto:${SALES_EMAIL}`} className="text-primary underline">{SALES_EMAIL}</a> and we'll get you set up.
             </p>
           </div>
         </div>
@@ -129,7 +136,7 @@ const SettingsBilling = () => {
         <Card>
           <CardHeader><CardTitle>Usage</CardTitle></CardHeader>
           <CardContent>
-            <p className="text-xs text-muted-foreground mb-4">Lifetime totals. Per-period reporting coming soon.</p>
+            <p className="text-xs text-muted-foreground mb-4">Lifetime totals for this workspace.</p>
             {usageLoading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : (

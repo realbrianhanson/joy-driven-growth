@@ -13,9 +13,20 @@ const copy = (text: string, label = "Copied") => {
   toast.success(label);
 };
 
+const normalizeContentType = (t: string): string => {
+  switch (t) {
+    case "twitter_thread": return "twitter";
+    case "linkedin_post": return "linkedin";
+    case "email_snippet": return "email";
+    case "case_study": return "casestudy";
+    case "quote_graphic": return "quote";
+    default: return t;
+  }
+};
+
 export const flattenContent = (contentType: string, data: any): string => {
   if (!data) return "";
-  switch (contentType) {
+  switch (normalizeContentType(contentType)) {
     case "twitter":
       return [
         ...(data.tweets || []).map((t: string, i: number) => `${i + 1}/ ${t}`),
@@ -29,9 +40,35 @@ export const flattenContent = (contentType: string, data: any): string => {
       return `${data.headline}\n\nChallenge: ${data.challenge}\n\nSolution: ${data.solution}\n\nResults: ${data.results}\n\n${(data.metrics || []).map((m: any) => `${m.label}: ${m.value}`).join("\n")}\n\n"${data.pullQuote}"`;
     case "quote":
       return `"${data.quote}" — ${data.author}${data.company ? `, ${data.company}` : ""}`;
+    case "instagram_carousel":
+      return (data.slides || []).map((s: any, i: number) =>
+        `Slide ${i + 1}: ${s.title || ""}\n${s.body || s.caption || ""}`).join("\n\n");
+    case "video_highlight":
+      return [data.title, data.summary, (data.clips || []).map((c: any) => `• ${c.timestamp || ""} ${c.quote || ""}`).join("\n")].filter(Boolean).join("\n\n");
+    case "ai_avatar":
+      return [data.title, data.script, data.cta].filter(Boolean).join("\n\n");
     default:
       return JSON.stringify(data, null, 2);
   }
+};
+
+/**
+ * Render a stored generated_content row's `content` text as readable plain text.
+ * Old rows were stored as JSON.stringify(structured) — parse and reflatten those.
+ */
+export const readableStoredContent = (type: string, raw: string | null | undefined): string => {
+  if (!raw) return "";
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      const flat = flattenContent(type, parsed);
+      if (flat && flat.trim().length > 0) return flat;
+    } catch {
+      /* fall through */
+    }
+  }
+  return raw;
 };
 
 const SectionLabel = ({ children }: { children: React.ReactNode }) => (
