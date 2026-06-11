@@ -72,7 +72,7 @@ serve(async (req) => {
       }, { onConflict: "user_id" });
     }
 
-    const origin = req.headers.get("origin") ?? "https://joy-driven-growth.lovable.app";
+    const origin = req.headers.get("origin") ?? "https://happyclient.io";
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "subscription",
