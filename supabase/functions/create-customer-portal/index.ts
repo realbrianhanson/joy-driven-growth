@@ -55,7 +55,7 @@ serve(async (req) => {
     }
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2024-11-20.acacia" });
-    const origin = req.headers.get("origin") ?? "https://joy-driven-growth.lovable.app";
+    const origin = req.headers.get("origin") ?? "https://happyclient.io";
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: sub.stripe_customer_id,
       return_url: `${origin}/dashboard/settings/billing`,
