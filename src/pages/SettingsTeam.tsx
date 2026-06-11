@@ -181,6 +181,11 @@ const SettingsTeam = () => {
           <CardContent className="p-0">
             {invites.isLoading ? (
               <p className="text-sm text-muted-foreground p-6">Loading…</p>
+            ) : invites.error ? (
+              <div className="flex items-start gap-3 p-6 text-sm text-destructive">
+                <AlertCircle className="w-4 h-4 mt-0.5" />
+                Couldn't load invites. {invites.error instanceof Error ? invites.error.message : ""}
+              </div>
             ) : invites.data?.length ? (
               <ul className="divide-y divide-border">
                 {invites.data.map((inv) => (
