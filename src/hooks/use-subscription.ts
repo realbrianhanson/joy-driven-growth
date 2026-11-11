@@ -21,7 +21,7 @@ export const useSubscription = () => {
     enabled: !!user,
     queryFn: async (): Promise<SubscriptionRow | null> => {
       if (!user) return null;
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("subscriptions")
         .select("plan, status, stripe_customer_id, stripe_subscription_id, current_period_end, cancel_at_period_end, trial_end")
         .eq("user_id", user.id)
