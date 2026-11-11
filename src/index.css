@@ -2,96 +2,178 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Happy Client design system.
+ * Ivory paper, near-black ink, one gold accent. Instrument Serif for display,
+ * Inter for everything you read or click. Every colour is an HSL token so the
+ * whole app re-skins from this file.
+ */
 @layer base {
   :root {
-    --background: 240 5% 97%;
-    --surface-subtle: 240 5% 96%;
-    --foreground: 240 10% 6%;
+    --background: 42 33% 96%;
+    --surface-subtle: 42 28% 93%;
+    --foreground: 30 12% 9%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 6%;
+    --card: 45 40% 99%;
+    --card-foreground: 30 12% 9%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 6%;
+    --popover: 45 40% 99%;
+    --popover-foreground: 30 12% 9%;
 
-    --primary: 239 84% 67%;
-    --primary-foreground: 0 0% 100%;
-    --primary-hover: 239 84% 58%;
-    --primary-light: 226 100% 97%;
+    /* Ink. Primary actions are near-black, never a bright brand colour. */
+    --primary: 30 12% 9%;
+    --primary-foreground: 42 40% 96%;
+    --primary-hover: 30 10% 20%;
+    --primary-light: 43 62% 91%;
 
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 4% 16%;
+    --secondary: 42 24% 91%;
+    --secondary-foreground: 30 12% 12%;
 
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
+    --muted: 42 24% 92%;
+    --muted-foreground: 32 8% 36%;
 
-    --accent: 240 5% 96%;
-    --accent-foreground: 240 4% 16%;
+    --accent: 43 45% 90%;
+    --accent-foreground: 30 12% 9%;
 
-    --destructive: 0 72% 51%;
+    /* Gold. Stars, highlights, focus. gold-deep is the text-safe shade. */
+    --gold: 40 64% 46%;
+    --gold-deep: 37 72% 30%;
+    --gold-light: 43 70% 91%;
+
+    --destructive: 6 68% 42%;
     --destructive-foreground: 0 0% 100%;
-    --destructive-light: 0 86% 97%;
+    --destructive-light: 8 70% 95%;
 
-    --success: 142 71% 45%;
-    --success-light: 138 76% 97%;
+    --success: 152 48% 28%;
+    --success-light: 140 36% 93%;
 
-    --warning: 32 95% 44%;
-    --warning-light: 48 96% 95%;
+    --warning: 30 82% 38%;
+    --warning-light: 42 85% 92%;
 
-    --border: 240 6% 90%;
-    --border-subtle: 240 5% 94%;
-    --input: 240 6% 90%;
-    --ring: 239 84% 67%;
+    --border: 40 18% 85%;
+    --border-subtle: 42 22% 90%;
+    --border-hover: 38 14% 68%;
+    --input: 40 16% 78%;
+    --ring: 40 64% 46%;
 
-    --radius: 0.5rem;
+    --radius: 0.625rem;
 
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 240 4% 16%;
-    --sidebar-primary: 239 84% 67%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 226 100% 97%;
-    --sidebar-accent-foreground: 239 84% 67%;
-    --sidebar-border: 240 6% 90%;
-    --sidebar-ring: 239 84% 67%;
+    --sidebar-background: 45 40% 99%;
+    --sidebar-foreground: 30 12% 12%;
+    --sidebar-primary: 30 12% 9%;
+    --sidebar-primary-foreground: 42 40% 96%;
+    --sidebar-accent: 43 62% 91%;
+    --sidebar-accent-foreground: 30 12% 9%;
+    --sidebar-border: 40 18% 85%;
+    --sidebar-ring: 40 64% 46%;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
 
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Slightly larger type on real screens. Most of our users are not 25. */
+  @media (min-width: 768px) {
+    html {
+      font-size: 16.5px;
+    }
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    line-height: 1.55;
+    font-feature-settings: "cv11", "ss03";
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-semibold tracking-tight text-foreground;
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    /* No colour here. A heading takes the colour of its container, so it stays readable on dark walls and panels. */
+    @apply font-semibold tracking-tight;
   }
 
-  p, span, li {
-    line-height: 1.6;
+  ::selection {
+    background: hsl(var(--gold) / 0.28);
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* Radix and shadcn draw their own rings. Avoid a double outline. */
+  [class*="focus-visible:ring"]:focus-visible,
+  [class*="focus:ring"]:focus-visible {
+    outline: none;
   }
 }
 
 @layer components {
+  /* Display type. Instrument Serif has one weight, so never bold it. */
+  .display {
+    font-family: theme("fontFamily.display");
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    line-height: 1.05;
+  }
+
+  .page-title {
+    font-family: theme("fontFamily.display");
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+    @apply text-[2rem] text-foreground;
+  }
+
+  .eyebrow {
+    @apply text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground;
+  }
+
+  /* A testimonial quote, set like print. */
+  .quote {
+    font-family: theme("fontFamily.display");
+    font-weight: 400;
+    letter-spacing: -0.005em;
+    line-height: 1.35;
+  }
+
   .card-hover {
-    @apply transition-all duration-150 ease-out;
+    @apply transition-all duration-200 ease-out;
   }
 
   .card-hover:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    border-color: hsl(240 4% 83%);
+    box-shadow: theme("boxShadow.hover");
+    border-color: hsl(var(--border-hover));
+  }
+
+  /* Gold hairline, used to separate sections on marketing and public pages. */
+  .rule-gold {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--gold) / 0.55) 20%,
+      hsl(var(--gold) / 0.55) 80%,
+      transparent
+    );
   }
 }
 
 @layer utilities {
   .animate-fade-in-up {
-    animation: fade-in 0.3s ease-out forwards;
+    animation: fade-in 0.3s ease-out both;
   }
 
   .scrollbar-thin::-webkit-scrollbar {
-    @apply w-1.5;
+    @apply h-1.5 w-1.5;
   }
 
   .scrollbar-thin::-webkit-scrollbar-track {
@@ -99,6 +181,51 @@
   }
 
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    @apply bg-border rounded-full;
+    @apply rounded-full bg-border;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+}
+
+/* Scroll reveal for the landing page. See components/shared/Reveal.tsx. */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.reveal-shown {
+  opacity: 1;
+  transform: none;
+}
+
+@media print {
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

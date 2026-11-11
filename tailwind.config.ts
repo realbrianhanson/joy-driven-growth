@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import animate from "tailwindcss-animate";
 
 export default {
   darkMode: ["class"],
@@ -7,19 +8,20 @@ export default {
   theme: {
     container: {
       center: true,
-      padding: "2rem",
+      padding: "1.5rem",
       screens: {
-        "2xl": "1400px",
+        "2xl": "1280px",
       },
     },
     extend: {
       fontFamily: {
-        sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "system-ui", "sans-serif"],
-        display: ['"Plus Jakarta Sans"', "Inter", "sans-serif"],
+        sans: ['"Inter Variable"', "Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "system-ui", "sans-serif"],
+        display: ['"Instrument Serif"', "Iowan Old Style", "Palatino Linotype", "Georgia", "serif"],
       },
       colors: {
         border: "hsl(var(--border))",
         "border-subtle": "hsl(var(--border-subtle))",
+        "border-hover": "hsl(var(--border-hover))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
@@ -66,6 +68,11 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        gold: {
+          DEFAULT: "hsl(var(--gold))",
+          deep: "hsl(var(--gold-deep))",
+          light: "hsl(var(--gold-light))",
+        },
         success: {
           DEFAULT: "hsl(var(--success))",
           light: "hsl(var(--success-light))",
@@ -74,17 +81,19 @@ export default {
           DEFAULT: "hsl(var(--warning))",
           light: "hsl(var(--warning-light))",
         },
-        revenue: "hsl(var(--warning))",
+        revenue: "hsl(var(--success))",
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
-        xl: "0.75rem",
+        xl: "0.875rem",
+        "2xl": "1.125rem",
       },
       boxShadow: {
-        subtle: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
-        hover: "0 4px 12px rgba(0,0,0,0.08)",
+        subtle: "0 1px 2px hsl(30 12% 9% / 0.04), 0 1px 1px hsl(30 12% 9% / 0.03)",
+        hover: "0 10px 30px -12px hsl(30 12% 9% / 0.18), 0 2px 6px hsl(30 12% 9% / 0.05)",
+        lift: "0 30px 70px -30px hsl(30 12% 9% / 0.35), 0 8px 20px -8px hsl(30 12% 9% / 0.12)",
       },
       keyframes: {
         "accordion-down": {
@@ -103,9 +112,9 @@ export default {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "fade-in": "fade-in 0.3s ease-out forwards",
+        "fade-in": "fade-in 0.3s ease-out both",
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [animate],
 } satisfies Config;
