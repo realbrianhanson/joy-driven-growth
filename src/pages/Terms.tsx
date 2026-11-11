@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
+import { Logo } from "@/components/shared/Logo";
 
 const Terms = () => (
   <div className="min-h-screen bg-background">
     <header className="border-b border-border">
       <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
-        <Link to="/" className="text-lg font-bold tracking-tight text-foreground">
-          Happy<span className="text-primary">Client</span>
+        <Link to="/" aria-label="Happy Client home">
+          <Logo size="sm" />
         </Link>
         <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
           Sign in
@@ -13,7 +14,7 @@ const Terms = () => (
       </div>
     </header>
     <main className="max-w-3xl mx-auto px-6 py-16">
-      <h1 className="font-display text-4xl font-bold tracking-tight text-foreground mb-2">Terms of Service</h1>
+      <h1 className="display text-[2.75rem] text-foreground mb-2">Terms of Service</h1>
       <p className="text-sm text-muted-foreground mb-12">Last updated: June 10, 2026</p>
 
       <div className="prose prose-neutral max-w-none space-y-8 text-foreground">

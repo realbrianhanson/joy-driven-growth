@@ -1,148 +1,176 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
-import { Loader2, CheckCircle2, AlertCircle, Mail } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { CheckCircle2, Loader2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Logo } from "@/components/shared/Logo";
+import { PublicNotice } from "@/components/shared/PublicNotice";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { formatDate } from "@/lib/format";
 
-type InviteRow = {
+interface InviteRow {
   id: string;
   owner_user_id: string;
   email: string;
   role: string;
   status: string;
   expires_at: string;
+}
+
+const PROBLEMS: Record<string, { title: string; message: string }> = {
+  invite_not_found: { title: "This invite link is not valid", message: "Check that you copied the whole link, or ask for a new invite." },
+  invite_expired: { title: "This invite has expired", message: "Ask the person who invited you to send a new one." },
+  invite_accepted: { title: "This invite was already used", message: "If that was you, sign in to open the account." },
+  invite_revoked: { title: "This invite was cancelled", message: "Ask the person who invited you to send a new one." },
+  cannot_join_own_team: { title: "This is your own account", message: "You sent this invite, so you cannot accept it." },
 };
 
-const ERROR_MESSAGES: Record<string, string> = {
-  invite_not_found: "Invite not found.",
-  invite_expired: "This invite has expired.",
-  invite_accepted: "This invite was already used.",
-  invite_revoked: "This invite was revoked.",
-  cannot_join_own_team: "You can't accept your own invite.",
-  not_authenticated: "Please sign in to accept this invite.",
+const ACCESS: Record<string, string> = {
+  admin: "You will be able to add, edit and approve testimonials, forms, walls and widgets.",
+  member: "You will be able to view everything in the account.",
 };
 
-const AcceptInvite = () => {
-  const { token } = useParams<{ token: string }>();
+/** The page a teammate lands on from an invite link. */
+export default function AcceptInvite() {
+  const { token = "" } = useParams<{ token: string }>();
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [invite, setInvite] = useState<InviteRow | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [accepting, setAccepting] = useState(false);
   const [accepted, setAccepted] = useState(false);
-  const [acceptError, setAcceptError] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!token) {
-      setLoadError("invite_not_found");
-      setLoading(false);
-      return;
-    }
-    supabase
-      .rpc("get_invite_by_token", { p_token: token })
-      .then(({ data, error }) => {
-        if (error) {
-          setLoadError(error.message);
-        } else if (!data || (Array.isArray(data) && data.length === 0)) {
-          setLoadError("invite_not_found");
-        } else {
-          const row = (Array.isArray(data) ? data[0] : data) as InviteRow;
-          setInvite(row);
-          if (row.status !== "pending") {
-            setLoadError(`invite_${row.status}`);
-          } else if (new Date(row.expires_at) < new Date()) {
-            setLoadError("invite_expired");
-          }
-        }
-        setLoading(false);
-      });
-  }, [token]);
+    document.title = "Team invite | Happy Client";
+  }, []);
 
-  const handleAccept = async () => {
-    if (!token) return;
+  const { data: invite, isLoading, error } = useQuery({
+    queryKey: ["team-invite", token],
+    enabled: !!token,
+    retry: 1,
+    queryFn: async (): Promise<InviteRow | null> => {
+      const { data, error: rpcError } = await supabase.rpc("get_invite_by_token", { p_token: token });
+      if (rpcError) throw rpcError;
+      const row = Array.isArray(data) ? data[0] : data;
+      return (row as InviteRow | undefined) ?? null;
+    },
+  });
+
+  const accept = async () => {
     setAccepting(true);
-    setAcceptError(null);
-    const { data, error } = await supabase.rpc("accept_team_invite", { p_token: token });
-    const result = (data as any) ?? {};
-    if (error || !result?.ok) {
-      const code = result?.error || "unknown";
-      setAcceptError(ERROR_MESSAGES[code] || error?.message || "Could not accept invite.");
+    setProblem(null);
+    const { data, error: rpcError } = await supabase.rpc("accept_team_invite", { p_token: token });
+    const result = (data ?? {}) as { ok?: boolean; error?: string };
+    if (rpcError || !result.ok) {
+      setProblem(result.error ?? "unknown");
       setAccepting(false);
       return;
     }
+    // The signed-in user now works in the inviter's account.
+    await queryClient.invalidateQueries();
     setAccepted(true);
-    setTimeout(() => navigate("/dashboard"), 1500);
+    setTimeout(() => navigate("/dashboard", { replace: true }), 1200);
   };
 
-  const goSignIn = () => {
-    navigate(`/login?redirect=${encodeURIComponent(`/accept-invite/${token}`)}`);
-  };
+  const returnPath = encodeURIComponent(`/accept-invite/${token}`);
+
+  if (isLoading || authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4" role="status" aria-label="Loading invite">
+        <Skeleton className="h-72 w-full max-w-md rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <PublicNotice
+        tone="error"
+        title="This invite did not load"
+        message="Check your connection, then try again."
+        action={<Button onClick={() => window.location.reload()}>Try again</Button>}
+      />
+    );
+  }
+
+  const loadProblem = !invite
+    ? "invite_not_found"
+    : invite.status !== "pending"
+      ? `invite_${invite.status}`
+      : new Date(invite.expires_at).getTime() < Date.now()
+        ? "invite_expired"
+        : null;
+  const blocking = loadProblem ?? (problem && PROBLEMS[problem] ? problem : null);
+
+  if (blocking) {
+    const info = PROBLEMS[blocking] ?? PROBLEMS.invite_not_found;
+    return (
+      <PublicNotice
+        title={info.title}
+        message={info.message}
+        action={
+          <Button asChild variant="outline">
+            <Link to={user ? "/dashboard" : "/login"}>{user ? "Go to your dashboard" : "Sign in"}</Link>
+          </Button>
+        }
+      />
+    );
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 bg-background">
-      <div className="max-w-md w-full rounded-2xl border border-border bg-card p-8">
-        {loading || authLoading ? (
-          <div className="text-center py-6">
-            <Loader2 className="w-7 h-7 text-primary animate-spin mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">Loading invite…</p>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-10">
+      <Link to="/" className="mb-8" aria-label="Happy Client home">
+        <Logo />
+      </Link>
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card px-8 py-10 text-center shadow-subtle">
+        {accepted ? (
+          <div role="status">
+            <CheckCircle2 className="mx-auto mb-4 h-10 w-10 text-success" />
+            <h1 className="display text-[1.75rem] text-foreground">You are on the team</h1>
+            <p className="mt-2 text-sm text-muted-foreground">Opening the account now.</p>
           </div>
-        ) : accepted ? (
-          <div className="text-center">
-            <CheckCircle2 className="w-10 h-10 text-primary mx-auto mb-4" />
-            <h1 className="text-xl font-semibold tracking-tight mb-2">You're on the team</h1>
-            <p className="text-sm text-muted-foreground mb-6">Redirecting to your dashboard…</p>
-            <Button asChild className="w-full"><Link to="/dashboard">Go to Dashboard</Link></Button>
-          </div>
-        ) : loadError ? (
-          <div className="text-center">
-            <AlertCircle className="w-10 h-10 text-destructive mx-auto mb-4" />
-            <h1 className="text-xl font-semibold tracking-tight mb-2">Invite unavailable</h1>
-            <p className="text-sm text-muted-foreground mb-6">{ERROR_MESSAGES[loadError] || loadError}</p>
-            <Button asChild variant="outline" className="w-full"><Link to="/">Go home</Link></Button>
-          </div>
-        ) : invite ? (
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <Mail className="w-5 h-5 text-primary" />
-              <span className="text-xs uppercase tracking-wider text-muted-foreground">Team invitation</span>
+        ) : (
+          <>
+            <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-gold-light">
+              <Users className="h-5 w-5 text-gold-deep" />
             </div>
-            <h1 className="text-2xl font-semibold tracking-tight mb-2">Join the team</h1>
-            <p className="text-sm text-muted-foreground mb-6">
-              You've been invited to join as <Badge variant="secondary" className="ml-1 text-[10px] uppercase tracking-wider">{invite.role}</Badge>.
-              The invite was sent to <span className="text-foreground font-medium">{invite.email}</span>.
+            <h1 className="display text-[1.75rem] text-foreground">Join the team</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              This invite was sent to <span className="font-medium text-foreground">{invite!.email}</span>. {ACCESS[invite!.role] ?? ACCESS.member}
             </p>
 
-            {acceptError && (
-              <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                {acceptError}
-              </div>
+            {problem && (
+              <p role="alert" className="mt-5 rounded-lg border border-destructive/30 bg-destructive-light px-3 py-2 text-sm text-destructive">
+                The invite was not accepted. Try again.
+              </p>
             )}
 
             {user ? (
-              <Button onClick={handleAccept} disabled={accepting} className="w-full">
-                {accepting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Accept invitation
-              </Button>
+              <>
+                <Button onClick={accept} disabled={accepting} size="lg" className="mt-6 w-full">
+                  {accepting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Accept the invite
+                </Button>
+                <p className="mt-3 text-xs text-muted-foreground">Signed in as {user.email}</p>
+              </>
             ) : (
-              <div className="space-y-2">
-                <Button onClick={goSignIn} className="w-full">Sign in to accept</Button>
-                <p className="text-xs text-muted-foreground text-center">
-                  You'll come back here automatically after signing in.
-                </p>
+              <div className="mt-6 space-y-2.5">
+                <Button asChild size="lg" className="w-full">
+                  <Link to={`/signup?redirect=${returnPath}`}>Create an account to join</Link>
+                </Button>
+                <Button asChild variant="outline" size="lg" className="w-full">
+                  <Link to={`/login?redirect=${returnPath}`}>I already have an account</Link>
+                </Button>
+                <p className="pt-1 text-xs text-muted-foreground">You come back to this page after you sign in.</p>
               </div>
             )}
 
-            <p className="text-[11px] text-muted-foreground text-center mt-6">
-              Expires {new Date(invite.expires_at).toLocaleDateString()}
-            </p>
-          </div>
-        ) : null}
+            <p className="mt-6 text-xs text-muted-foreground">This invite expires on {formatDate(invite!.expires_at)}.</p>
+          </>
+        )}
       </div>
     </div>
   );
-};
-
-export default AcceptInvite;
+}

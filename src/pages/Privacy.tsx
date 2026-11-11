@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
+import { Logo } from "@/components/shared/Logo";
 
 const Privacy = () => (
   <div className="min-h-screen bg-background">
     <header className="border-b border-border">
       <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
-        <Link to="/" className="text-lg font-bold tracking-tight text-foreground">
-          Happy<span className="text-primary">Client</span>
+        <Link to="/" aria-label="Happy Client home">
+          <Logo size="sm" />
         </Link>
         <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
           Sign in
@@ -13,7 +14,7 @@ const Privacy = () => (
       </div>
     </header>
     <main className="max-w-3xl mx-auto px-6 py-16">
-      <h1 className="font-display text-4xl font-bold tracking-tight text-foreground mb-2">Privacy Policy</h1>
+      <h1 className="display text-[2.75rem] text-foreground mb-2">Privacy Policy</h1>
       <p className="text-sm text-muted-foreground mb-12">Last updated: June 10, 2026</p>
 
       <div className="prose prose-neutral max-w-none space-y-8 text-foreground">
@@ -29,10 +30,10 @@ const Privacy = () => (
         <section>
           <h2 className="text-xl font-semibold mb-3">Information we collect</h2>
           <ul className="list-disc pl-6 space-y-2 text-muted-foreground leading-relaxed">
-            <li><strong className="text-foreground">Account data</strong> — name, email, company, and authentication identifiers when you sign up.</li>
-            <li><strong className="text-foreground">Testimonial data</strong> — text, audio, video, ratings, and contact details submitted to your collection forms.</li>
-            <li><strong className="text-foreground">Usage data</strong> — pages visited, features used, and basic device/browser metadata to operate and improve the Service.</li>
-            <li><strong className="text-foreground">Billing data</strong> — handled by our payment processor; we never store full card numbers.</li>
+            <li><strong className="text-foreground">Account data</strong>: name, email, company, and authentication identifiers when you sign up.</li>
+            <li><strong className="text-foreground">Testimonial data</strong>: text, audio, video, ratings, and contact details submitted to your collection forms.</li>
+            <li><strong className="text-foreground">Usage data</strong>: pages visited, features used, and basic device/browser metadata to operate and improve the Service.</li>
+            <li><strong className="text-foreground">Billing data</strong>: handled by our payment processor; we never store full card numbers.</li>
           </ul>
         </section>
 
