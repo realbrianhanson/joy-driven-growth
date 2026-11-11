@@ -1,155 +1,156 @@
-# Welcome to your Lovable project
+# Happy Client
 
-## Project info
+Happy Client collects client testimonials with one link, lets the owner approve them, and shows them on a wall page or a website widget. It also logs the sales a testimonial helped close and drafts marketing copy from a client's own words.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+Live site: https://happyclient.io
+Lovable project: https://lovable.dev/projects/f6e5cf56-bcef-49af-adf9-a58e8274ed83
 
-## How can I edit this code?
+## How it is built
 
-There are several ways of editing your application.
+| Layer | What |
+| --- | --- |
+| App | Vite, React 18, TypeScript, Tailwind, shadcn/ui, TanStack Query, react-router |
+| Data | Supabase (Lovable Cloud): Postgres with row-level security, Auth, Storage, Realtime |
+| Server code | Supabase edge functions (Deno) in `supabase/functions` |
+| AI | Lovable AI gateway, called only from edge functions |
+| Email, texts, payments | Resend, Twilio, Stripe. Each one is optional. |
 
-**Use Lovable**
+### Where things are
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+```
+src/pages            One file for each screen
+src/components       shared/ (used everywhere), layout/, testimonials/, form-builder/, content/, ui/ (shadcn)
+src/hooks            Data hooks. Every query is scoped to the workspace owner.
+src/lib              Pure helpers with unit tests in src/lib/__tests__
+supabase/functions   Edge functions. _shared/ holds pure helpers with tests.
+supabase/migrations  Database history
+public/widget.js     The one-line embed script for customer websites
+```
 
-Changes made via Lovable will be committed automatically to this repo.
+### Screens
 
-**Use your preferred IDE**
+- Public, no sign-in: landing page, collection form (`/collect/:slug`), guided interview (`/collect/:slug/ai`), wall (`/wall/:slug`), widget frame (`/embed/widget/:id`), team invite.
+- Dashboard: Home, Testimonials, Forms, Text campaigns, Walls, Widgets, Content, Results, Settings.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Edge functions
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+| Function | Who may call it | What it does |
+| --- | --- | --- |
+| `submit-testimonial` | Anyone with a published form slug, or an API key | Checks and saves a testimonial as "Needs review" |
+| `ai-interview` | Anyone, for a published form with the interview on | Asks follow-up questions and writes a draft the client approves |
+| `develop-testimonial` | Signed-in owner or team | Writes a polished draft beside the original words |
+| `analyze-testimonial` | Signed-in user | Picks the best lines and themes |
+| `generate-content` | Signed-in owner or team | Drafts a post, thread, email, case study or quote image from approved testimonials |
+| `start-campaign` | Signed-in owner or team admin | The only way texts enter the sending queue. Enforces plan, country and length rules. |
+| `process-campaign-jobs` | The database scheduler, with a shared key | Sends queued texts through Twilio |
+| `twilio-status-webhook` | Twilio, signature checked | Records delivery results |
+| `track-revenue` | Signed-in owner or team | Logs a sale against a testimonial |
+| `send-team-invite` | Signed-in owner | Emails a team invite |
+| `create-checkout-session`, `create-customer-portal`, `stripe-webhook` | Signed-in user, or Stripe with a signature | Billing |
+| `send-sms` | Nobody | Retired. It answers 410. Delete it after the next deploy. |
 
-Follow these steps:
+## Rules the product keeps
+
+These are product decisions. Keep them when you add features.
+
+1. **Nothing invented.** No made-up numbers, logos, reviews or "trusted by" claims anywhere in the app or the landing page. The example wall on the landing page is labelled as an example.
+2. **The client's words stay the client's words.** AI drafts never replace the original text. A pull quote must appear word for word in the testimonial, and the server checks that. Numbers in a generated draft that the client never gave are flagged for the owner.
+3. **Permission is recorded.** Each submission stores the consent text the client agreed to, when, and how they want their name shown.
+4. **Reviews are not filtered by rating.** The public review prompt on a form shows to every client. Sending only happy clients to a review site breaks the FTC Consumer Review Rule (16 CFR Part 465).
+5. **Texts cost money and reach real phones.** Every limit on texting is enforced on the server.
+
+## Run it on your computer
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+bun install
+bun run dev        # http://localhost:8080
+bun run test       # unit tests (vitest)
+bun run lint
+bun run build
 ```
 
-**Edit a file directly in GitHub**
+The `.env` file holds the public Supabase URL and key. No secret belongs in it.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+To type-check the edge functions:
 
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
-
-## Enabling billing
-
-Billing is built but disconnected by default so the project remains remixable. To turn it on:
-
-### 1. Create products in Stripe
-
-Create two recurring products in your Stripe dashboard:
-- **Starter** — $29/mo
-- **Pro** — $79/mo
-
-(Scale is "contact sales" only — no Stripe product needed.)
-
-Copy the price IDs (they look like `price_1XYZabc...`).
-
-### 2. Set Supabase Edge Function secrets
-
-In your Supabase project → Project Settings → Edge Functions → Secrets, add:
-
-```
-STRIPE_SECRET_KEY=sk_live_...      # or sk_test_... for testing
-STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRICE_STARTER=price_...
-STRIPE_PRICE_PRO=price_...
+```sh
+cd supabase/functions && npx deno check --no-lock */index.ts
 ```
 
-### 3. Update price IDs in code
+## How changes go live
 
-Edit `src/lib/billing-plans.ts` and replace the `STRIPE_PRICE_IDS` placeholders with your real price IDs.
+1. Push to `main` on GitHub. Lovable syncs the code and rebuilds the preview.
+2. **Edge functions and migrations do not deploy on sync.** After a push that changes `supabase/functions` or `supabase/migrations`, ask Lovable in the project chat to deploy the changed functions or run the new migration.
+3. Click Publish in Lovable to update the live site.
 
-### 4. Configure the Stripe webhook
+## Secrets
 
-In your Stripe dashboard → Developers → Webhooks → Add endpoint:
+Set these in Lovable under Cloud, Secrets. A missing optional secret turns its feature off with a clear message. Nothing crashes.
 
-- **Endpoint URL**: `https://<your-project>.supabase.co/functions/v1/stripe-webhook`
-- **Events to send**:
-  - `checkout.session.completed`
-  - `customer.subscription.created`
-  - `customer.subscription.updated`
-  - `customer.subscription.deleted`
-  - `payment_intent.succeeded`
+| Secret | Needed for | Notes |
+| --- | --- | --- |
+| `LOVABLE_API_KEY` | All AI features | Lovable sets this for you |
+| `PUBLIC_APP_URL` | Links in invite emails and texts | Defaults to `https://happyclient.io` |
+| `RESEND_API_KEY` | Team invite emails | Without it, the owner copies the invite link by hand |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` | Text campaigns | See "Turn on text campaigns" |
+| `INTERNAL_WORKER_KEY` | Text campaigns | Shared key between the database scheduler and the sender |
+| `SMS_ALLOWED_COUNTRY_CODES` | Text campaigns | Optional. Comma-separated calling codes, such as `1,44`. Defaults to `1` (US and Canada). |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO` | Billing | See "Turn on billing" |
+| `AI_MODEL_FAST`, `AI_MODEL_QUALITY` | Optional | Force a model ID. See "AI models". |
 
-Copy the webhook signing secret into `STRIPE_WEBHOOK_SECRET`.
+## AI models
 
-### 5. Test
+Every AI call goes through `supabase/functions/_shared/ai.ts`. It tries a short list of models in order and uses the first one that answers, so a retired model costs one fast failed request and the feature keeps working. The current list starts with `google/gemini-3.8-flash`.
 
-Open the app → Settings → Billing → Upgrade. The "Billing not yet connected" banner should disappear once all four secrets are set. Use Stripe test cards (`4242 4242 4242 4242`) until you're ready to flip to live keys.
+To change models with no code change, set `AI_MODEL_FAST` (chat) or `AI_MODEL_QUALITY` (writing) to a model ID from Lovable, Connectors, AI, Available models.
 
-## Enabling SMS campaigns
+## Turn on billing
 
-SMS sends run server-side via a queue worker + Twilio status webhooks. To enable:
+Checkout stays closed until real Stripe price IDs are in place. Until then the app shows "Email us to upgrade".
 
-### 1. Set Supabase Edge Function secrets
+1. In Stripe, create two monthly products: Starter at $29 and Pro at $79. Scale is sold by contact, so it needs no product.
+2. Add the four Stripe secrets from the table above.
+3. In `src/lib/billing-plans.ts`, replace the two `price_REPLACE_ME` placeholders with the real price IDs.
+4. In Stripe, Developers, Webhooks, add the endpoint `https://ldniwvyjycerpdlwhntu.supabase.co/functions/v1/stripe-webhook` with these events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `payment_intent.succeeded`. Copy the signing secret into `STRIPE_WEBHOOK_SECRET`.
+5. Test with card `4242 4242 4242 4242` in Stripe test mode before you switch to live keys.
 
-```
-TWILIO_ACCOUNT_SID=AC...
-TWILIO_AUTH_TOKEN=...
-TWILIO_PHONE_NUMBER=+1...   # the 10DLC-registered sending number
-INTERNAL_WORKER_KEY=<a long random string>
-```
+Plan limits such as "25 testimonials" on Free are listed on the pricing page. Today the server enforces only the monthly text allowance. Enforce the other limits before you charge for them.
 
-### 2. Wire pg_cron to the worker endpoint
+## Turn on text campaigns
 
-After the migration runs, open the Supabase SQL editor and run:
+Texts go out only through the `start-campaign` function. It checks the sender's plan allowance (Free 0, Starter 100, Pro 500 each month, Scale no monthly cap), the country of every number, the message length, and that the message carries the owner's form link. The browser cannot write to the sending queue.
 
-```sql
-ALTER DATABASE postgres SET app.worker_url = 'https://<your-project>.supabase.co/functions/v1/process-campaign-jobs';
-ALTER DATABASE postgres SET app.worker_key = '<the same INTERNAL_WORKER_KEY value>';
-```
+1. Add the three Twilio secrets and `INTERNAL_WORKER_KEY` (a long random string).
+2. In the SQL editor, point the scheduler at the sender:
 
-This makes the pg_cron job (which runs every minute) able to invoke the worker with the right URL and shared secret.
+   ```sql
+   ALTER DATABASE postgres SET app.worker_url = 'https://ldniwvyjycerpdlwhntu.supabase.co/functions/v1/process-campaign-jobs';
+   ALTER DATABASE postgres SET app.worker_key = '<the same INTERNAL_WORKER_KEY value>';
+   ```
 
-### 3. Configure Twilio's status callback
+3. Register the sending number with Twilio for A2P 10DLC (a Brand and a Campaign). Carriers block unregistered traffic.
+4. To let one account send before checkout is live, set its plan by hand:
 
-The worker passes `StatusCallback=https://<your-project>.supabase.co/functions/v1/twilio-status-webhook` on every outbound SMS, so Twilio will POST delivery updates automatically. No additional Twilio dashboard config needed; just make sure your AuthToken matches `TWILIO_AUTH_TOKEN`.
+   ```sql
+   UPDATE subscriptions SET plan = 'starter', status = 'active' WHERE user_id = '<the account owner id>';
+   ```
 
-### 4. TCPA / 10DLC
+The owner is responsible for consent. The builder makes them confirm that every person on the list agreed to get texts, and the default message includes "Reply STOP to opt out".
 
-The Compliance disclosure on the campaign recipients step is informational. You are still responsible for:
-- Collecting prior express written consent before sending to any US number.
-- Including "Reply STOP to unsubscribe" in your message template (the default template does this).
-- Registering your business and use case via Twilio 10DLC, including a Brand and Campaign approval. Happy Client does not handle this for you.
+## Check before you trust it with real data
+
+- [ ] Send a test submission through a published form on a phone, with a video. It shows up under Needs review and the video plays.
+- [ ] Approve it, add it to a wall, and open the wall in a private window.
+- [ ] Paste a widget's embed code into a page on another site.
+- [ ] In Content, write one draft. Read it against the testimonial.
+- [ ] Invite a second email address as "View only" and confirm it cannot approve.
+- [ ] If text campaigns are on, send one campaign to your own phone.
+- [ ] If billing is on, buy the Starter plan with a test card and confirm the plan shows on Settings, Plan and billing.
+
+## Known limits
+
+- Plan limits other than the text allowance are not enforced on the server.
+- Media buckets are public by link. File names are random and cannot be listed, but a link that leaks stays readable. Private buckets with signed links are the next step.
+- The owner gets no email when a new testimonial arrives. The dashboard shows a live notice.
+- Video and audio testimonials have no transcript, so Content works from written text only.
+- Sales are logged by hand. There is no link to a customer's own Stripe account.
