@@ -1,249 +1,159 @@
-import { Copy, Star } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import QuoteGraphic, { QuoteGraphicData } from "./QuoteGraphic";
+import type { ReactNode } from "react";
+import { CopyButton } from "@/components/shared/CopyButton";
+import { QuoteGraphic } from "@/components/content/QuoteGraphic";
+import {
+  type ContentKind,
+  flattenContent,
+  readCaseStudy,
+  readEmail,
+  readLinkedIn,
+  readQuote,
+  readThread,
+} from "@/lib/content";
+import { cn } from "@/lib/utils";
 
-interface ContentRendererProps {
-  contentType: string;
-  data: any;
+function Label({ children }: { children: ReactNode }) {
+  return <p className="eyebrow mb-2">{children}</p>;
 }
 
-const copy = (text: string, label = "Copied") => {
-  navigator.clipboard.writeText(text);
-  toast.success(label);
-};
+function Paper({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn("rounded-xl border border-border bg-background/60 p-5", className)}>{children}</div>;
+}
 
-const normalizeContentType = (t: string): string => {
-  switch (t) {
-    case "twitter_thread": return "twitter";
-    case "linkedin_post": return "linkedin";
-    case "email_snippet": return "email";
-    case "case_study": return "casestudy";
-    case "quote_graphic": return "quote";
-    default: return t;
-  }
-};
-
-export const flattenContent = (contentType: string, data: any): string => {
-  if (!data) return "";
-  switch (normalizeContentType(contentType)) {
-    case "twitter":
-      return [
-        ...(data.tweets || []).map((t: string, i: number) => `${i + 1}/ ${t}`),
-        (data.hashtags || []).join(" "),
-      ].filter(Boolean).join("\n\n");
-    case "linkedin":
-      return [data.hook, data.body, data.cta, (data.hashtags || []).join(" ")].filter(Boolean).join("\n\n");
-    case "email":
-      return `Subject: ${data.subjectLines?.[0] || ""}\nPreheader: ${data.preheader || ""}\n\n${data.body || ""}\n\n[${data.cta || "CTA"}]`;
-    case "casestudy":
-      return `${data.headline}\n\nChallenge: ${data.challenge}\n\nSolution: ${data.solution}\n\nResults: ${data.results}\n\n${(data.metrics || []).map((m: any) => `${m.label}: ${m.value}`).join("\n")}\n\n"${data.pullQuote}"`;
-    case "quote":
-      return `"${data.quote}" — ${data.author}${data.company ? `, ${data.company}` : ""}`;
-    case "instagram_carousel":
-      return (data.slides || []).map((s: any, i: number) =>
-        `Slide ${i + 1}: ${s.title || ""}\n${s.body || s.caption || ""}`).join("\n\n");
-    case "video_highlight":
-      return [data.title, data.summary, (data.clips || []).map((c: any) => `• ${c.timestamp || ""} ${c.quote || ""}`).join("\n")].filter(Boolean).join("\n\n");
-    case "ai_avatar":
-      return [data.title, data.script, data.cta].filter(Boolean).join("\n\n");
-    default:
-      return JSON.stringify(data, null, 2);
-  }
-};
-
-/**
- * Render a stored generated_content row's `content` text as readable plain text.
- * Old rows were stored as JSON.stringify(structured) — parse and reflatten those.
- */
-export const readableStoredContent = (type: string, raw: string | null | undefined): string => {
-  if (!raw) return "";
-  const trimmed = raw.trim();
-  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-    try {
-      const parsed = JSON.parse(trimmed);
-      const flat = flattenContent(type, parsed);
-      if (flat && flat.trim().length > 0) return flat;
-    } catch {
-      /* fall through */
-    }
-  }
-  return raw;
-};
-
-const SectionLabel = ({ children }: { children: React.ReactNode }) => (
-  <div className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground mb-1.5">{children}</div>
-);
-
-const TwitterView = ({ data }: { data: any }) => {
-  const tweets: string[] = data.tweets || [];
-  const hashtags: string[] = data.hashtags || [];
+function LinkedInView({ data }: { data: unknown }) {
+  const post = readLinkedIn(data);
   return (
-    <div className="space-y-0">
-      {tweets.map((tweet, i) => (
-        <div key={i} className="relative">
-          <div className="flex gap-3">
-            <div className="flex flex-col items-center">
-              <div className="w-9 h-9 rounded-full bg-primary-light text-primary flex items-center justify-center text-xs font-semibold shrink-0">
-                HC
-              </div>
-              {i < tweets.length - 1 && <div className="w-px flex-1 bg-border my-1" />}
-            </div>
-            <div className="flex-1 pb-4">
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <div className="text-sm font-semibold text-foreground">
-                  Happy Client <span className="text-muted-foreground font-normal">· {i + 1}/{tweets.length}</span>
-                </div>
-                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => copy(tweet, "Tweet copied")}>
-                  <Copy className="w-3 h-3" />
-                </Button>
-              </div>
-              <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{tweet}</div>
-            </div>
+    <Paper className="space-y-3 text-[0.9375rem] leading-relaxed text-foreground">
+      <p className="font-semibold">{post.hook}</p>
+      <p className="whitespace-pre-wrap">{post.body}</p>
+      {post.cta && <p>{post.cta}</p>}
+      {post.hashtags.length > 0 && <p className="text-muted-foreground">{post.hashtags.join(" ")}</p>}
+    </Paper>
+  );
+}
+
+function ThreadView({ data }: { data: unknown }) {
+  const { tweets } = readThread(data);
+  return (
+    <ol className="space-y-2.5">
+      {tweets.map((tweet, index) => (
+        <li key={index} className="flex items-start gap-3 rounded-xl border border-border bg-background/60 p-4">
+          <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold tabular-nums text-muted-foreground">
+            {index + 1}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="whitespace-pre-wrap text-[0.9375rem] leading-relaxed text-foreground">{tweet}</p>
+            <p className={cn("mt-1.5 text-xs tabular-nums", tweet.length > 280 ? "text-destructive" : "text-muted-foreground")}>
+              {tweet.length} of 280 characters
+            </p>
           </div>
-        </div>
+          <CopyButton text={tweet} iconOnly variant="ghost" label={`Copy post ${index + 1}`} className="-mr-1 -mt-1 shrink-0" />
+        </li>
       ))}
-      {hashtags.length > 0 && (
-        <div className="pt-3 border-t border-border">
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <SectionLabel>Hashtags</SectionLabel>
-            <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => copy(hashtags.join(" "), "Hashtags copied")}>
-              <Copy className="w-3 h-3 mr-1" />Copy all
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {hashtags.map((h, i) => (
-              <span key={i} className="px-2 py-0.5 rounded-md bg-muted text-xs text-foreground">{h}</span>
-            ))}
-          </div>
+    </ol>
+  );
+}
+
+function EmailView({ data }: { data: unknown }) {
+  const email = readEmail(data);
+  return (
+    <div className="space-y-5">
+      <div>
+        <Label>Subject lines</Label>
+        <ul className="space-y-2">
+          {email.subjectLines.map((subject, index) => (
+            <li key={index} className="flex items-center gap-2 rounded-lg border border-border bg-background/60 py-1.5 pl-3.5 pr-1.5">
+              <span className="min-w-0 flex-1 text-sm text-foreground">{subject}</span>
+              <CopyButton text={subject} iconOnly variant="ghost" label="Copy subject line" className="shrink-0" />
+            </li>
+          ))}
+        </ul>
+      </div>
+      {email.preheader && (
+        <div>
+          <Label>Preview text</Label>
+          <p className="text-sm text-muted-foreground">{email.preheader}</p>
         </div>
       )}
-    </div>
-  );
-};
-
-const LinkedInView = ({ data }: { data: any }) => {
-  const full = flattenContent("linkedin", data);
-  return (
-    <div className="space-y-3">
-      <div className="rounded-lg border border-border bg-card p-4">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-full bg-primary-light text-primary flex items-center justify-center text-sm font-semibold">HC</div>
-          <div>
-            <div className="text-sm font-semibold text-foreground">Happy Client</div>
-            <div className="text-xs text-muted-foreground">Founder · 1st</div>
-          </div>
-        </div>
-        <div className="text-sm font-semibold text-foreground mb-2">{data.hook}</div>
-        <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed mb-3">{data.body}</div>
-        {data.cta && <div className="text-sm text-foreground mb-3">{data.cta}</div>}
-        {data.hashtags?.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {data.hashtags.map((h: string, i: number) => (
-              <span key={i} className="text-xs font-medium text-[#0a66c2]">{h}</span>
-            ))}
-          </div>
-        )}
-      </div>
-      <Button variant="outline" size="sm" className="h-8" onClick={() => copy(full, "Post copied")}>
-        <Copy className="w-3.5 h-3.5 mr-1.5" />Copy post
-      </Button>
-    </div>
-  );
-};
-
-const EmailView = ({ data }: { data: any }) => (
-  <div className="space-y-4">
-    <div>
-      <SectionLabel>Subject lines</SectionLabel>
-      <div className="space-y-1.5">
-        {(data.subjectLines || []).map((s: string, i: number) => (
-          <div key={i} className="flex items-center justify-between gap-2 p-2.5 rounded-md border border-border bg-muted/30">
-            <span className="text-sm text-foreground flex-1">{s}</span>
-            <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => copy(s, "Subject copied")}>
-              <Copy className="w-3 h-3" />
-            </Button>
-          </div>
-        ))}
-      </div>
-    </div>
-    {data.preheader && (
       <div>
-        <SectionLabel>Preheader</SectionLabel>
-        <div className="text-sm text-muted-foreground italic">{data.preheader}</div>
+        <Label>Body</Label>
+        <Paper>
+          <p className="whitespace-pre-wrap text-[0.9375rem] leading-relaxed text-foreground">{email.body}</p>
+          {email.cta && (
+            <span className="mt-4 inline-block rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">{email.cta}</span>
+          )}
+        </Paper>
       </div>
-    )}
-    <div>
-      <SectionLabel>Body</SectionLabel>
-      <div className="rounded-lg border border-border bg-card p-4 text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-        {data.body}
-        {data.cta && (
-          <div className="mt-4">
-            <span className="inline-block px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium">{data.cta}</span>
-          </div>
-        )}
-      </div>
-      <Button variant="outline" size="sm" className="h-8 mt-2" onClick={() => copy(data.body || "", "Body copied")}>
-        <Copy className="w-3.5 h-3.5 mr-1.5" />Copy body
-      </Button>
-    </div>
-  </div>
-);
-
-const CaseStudyView = ({ data }: { data: any }) => {
-  const full = flattenContent("casestudy", data);
-  return (
-    <div className="space-y-4">
-      <div className="rounded-lg border border-border bg-card p-5 space-y-4">
-        <h3 className="text-lg font-semibold text-foreground tracking-tight leading-tight">{data.headline}</h3>
-        {[
-          { label: "The Challenge", value: data.challenge },
-          { label: "The Solution", value: data.solution },
-          { label: "The Results", value: data.results },
-        ].map((s) => (
-          <div key={s.label}>
-            <SectionLabel>{s.label}</SectionLabel>
-            <div className="text-sm text-foreground leading-relaxed">{s.value}</div>
-          </div>
-        ))}
-        {data.metrics?.length > 0 && (
-          <div className="grid grid-cols-2 gap-2 pt-2">
-            {data.metrics.map((m: any, i: number) => (
-              <div key={i} className="rounded-lg border border-border bg-muted/30 p-3">
-                <div className="text-lg font-semibold text-foreground tabular-nums">{m.value}</div>
-                <div className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground mt-0.5">{m.label}</div>
-              </div>
-            ))}
-          </div>
-        )}
-        {data.pullQuote && (
-          <blockquote className="border-l-2 border-primary pl-3 italic text-sm text-foreground">
-            &ldquo;{data.pullQuote}&rdquo;
-          </blockquote>
-        )}
-      </div>
-      <Button variant="outline" size="sm" className="h-8" onClick={() => copy(full, "Case study copied")}>
-        <Copy className="w-3.5 h-3.5 mr-1.5" />Copy as text
-      </Button>
     </div>
   );
-};
+}
 
-const ContentRenderer = ({ contentType, data }: ContentRendererProps) => {
-  if (!data) return null;
-  switch (contentType) {
-    case "twitter": return <TwitterView data={data} />;
-    case "linkedin": return <LinkedInView data={data} />;
-    case "email": return <EmailView data={data} />;
-    case "casestudy": return <CaseStudyView data={data} />;
-    case "quote": return <QuoteGraphic data={data as QuoteGraphicData} />;
-    default:
-      return (
-        <pre className="p-4 rounded-lg bg-muted/40 border border-border text-xs text-foreground overflow-auto">
-          {JSON.stringify(data, null, 2)}
-        </pre>
-      );
+function CaseStudyView({ data }: { data: unknown }) {
+  const study = readCaseStudy(data);
+  const sections = [
+    { label: "The challenge", text: study.challenge },
+    { label: "The solution", text: study.solution },
+    { label: "The results", text: study.results },
+  ].filter((section) => section.text);
+
+  return (
+    <Paper className="space-y-5">
+      <h3 className="display text-2xl leading-tight text-foreground sm:text-3xl">{study.headline}</h3>
+      {sections.map((section) => (
+        <div key={section.label}>
+          <Label>{section.label}</Label>
+          <p className="text-[0.9375rem] leading-relaxed text-foreground">{section.text}</p>
+        </div>
+      ))}
+      {study.metrics.length > 0 && (
+        <dl className="grid grid-cols-2 gap-2.5">
+          {study.metrics.map((metric, index) => (
+            <div key={index} className="rounded-lg border border-border bg-card px-4 py-3">
+              <dd className="display text-2xl tabular-nums text-foreground">{metric.value}</dd>
+              <dt className="mt-0.5 text-xs text-muted-foreground">{metric.label}</dt>
+            </div>
+          ))}
+        </dl>
+      )}
+      {study.pullQuote && (
+        <blockquote className="border-l-2 border-gold pl-4">
+          <p className="quote text-lg text-foreground">&ldquo;{study.pullQuote}&rdquo;</p>
+        </blockquote>
+      )}
+    </Paper>
+  );
+}
+
+interface ContentRendererProps {
+  kind: ContentKind;
+  data: unknown;
+}
+
+/** Shows one generated piece in the layout that fits its format. */
+export function ContentRenderer({ kind, data }: ContentRendererProps) {
+  switch (kind) {
+    case "linkedin":
+      return <LinkedInView data={data} />;
+    case "twitter":
+      return <ThreadView data={data} />;
+    case "email":
+      return <EmailView data={data} />;
+    case "casestudy":
+      return <CaseStudyView data={data} />;
+    case "quote":
+      return <QuoteGraphic data={readQuote(data)} />;
   }
+}
+
+const COPY_LABELS: Record<ContentKind, string> = {
+  linkedin: "Copy post",
+  twitter: "Copy thread",
+  email: "Copy email",
+  casestudy: "Copy case study",
+  quote: "Copy quote",
 };
 
-export default ContentRenderer;
+/** One button that copies the whole piece as plain text. */
+export function CopyContentButton({ kind, data, variant = "outline" }: ContentRendererProps & { variant?: "outline" | "default" }) {
+  return <CopyButton text={flattenContent(kind, data)} label={COPY_LABELS[kind]} variant={variant} size="default" />;
+}

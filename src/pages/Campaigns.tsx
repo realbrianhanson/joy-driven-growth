@@ -1,380 +1,345 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Plus, Send, TrendingUp, MessageSquare, Users, Megaphone, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Link } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { MessageSquareText, PenLine, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageContainer, PageHeader } from "@/components/shared/PageHeader";
+import { EmptyState, ErrorState } from "@/components/shared/States";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/use-auth";
-import { useWorkspace } from "@/hooks/use-workspace";
-import { useDemoMode } from "@/contexts/DemoModeContext";
-import { MOCK_CAMPAIGNS } from "@/data/mock/campaigns";
+import type { Database } from "@/integrations/supabase/types";
 import { usePlan } from "@/hooks/use-plan";
+import { useWorkspace } from "@/hooks/use-workspace";
+import { SMS_MONTHLY_ALLOWANCE } from "@/lib/billing-plans";
+import { formatDate, pluralize } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
-const PLAN_SMS_LIMITS: Record<string, number | null> = {
-  free: 0,
-  starter: 100,
-  pro: 500,
-  scale: null, // unlimited
+type Campaign = Database["public"]["Tables"]["campaigns"]["Row"];
+
+type Tone = "muted" | "gold" | "success" | "warning";
+
+const TONES: Record<Tone, string> = {
+  muted: "bg-muted text-muted-foreground",
+  gold: "bg-gold-light text-gold-deep",
+  success: "bg-success-light text-success",
+  warning: "bg-warning-light text-warning",
 };
 
-export default function Campaigns() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const { workspaceOwnerId } = useWorkspace();
-  const { isDemoMode } = useDemoMode();
-  const { plan } = usePlan();
-  const queryClient = useQueryClient();
-  const [detailCampaign, setDetailCampaign] = useState<any | null>(null);
+const JOB_LABELS: Record<string, string> = {
+  pending: "Waiting to send",
+  processing: "Sending",
+  sent: "Sent, waiting for the carrier",
+  delivered: "Delivered",
+  failed: "Failed",
+  undelivered: "Not delivered",
+};
 
-  const { data: realCampaigns, isLoading, error: campaignsError, refetch } = useQuery({
+/** Where a campaign stands, in plain words. The database keeps "active" after the last text, so "Sent" is worked out here. */
+function campaignState(campaign: Campaign): { label: string; tone: Tone } {
+  const total = campaign.total_recipients ?? 0;
+  const attempted = campaign.sent_count ?? 0;
+  switch (campaign.status) {
+    case "scheduled":
+      return {
+        label: campaign.scheduled_at
+          ? `Scheduled for ${new Date(campaign.scheduled_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`
+          : "Scheduled",
+        tone: "gold",
+      };
+    case "active":
+      return total > 0 && attempted >= total ? { label: "Sent", tone: "success" } : { label: "Sending", tone: "gold" };
+    case "completed":
+      return { label: "Sent", tone: "success" };
+    case "paused":
+      return { label: "Stopped", tone: "warning" };
+    default:
+      return { label: "Draft", tone: "muted" };
+  }
+}
+
+function Tile({ label, value, note }: { label: string; value: string; note?: string }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card px-5 py-4">
+      <p className="eyebrow">{label}</p>
+      <p className="display mt-2 text-3xl tabular-nums text-foreground">{value}</p>
+      {note && <p className="mt-1 text-xs text-muted-foreground">{note}</p>}
+    </div>
+  );
+}
+
+/** Text campaigns: send a form link to a list of clients by SMS, and see what was delivered. */
+export default function Campaigns() {
+  const { workspaceOwnerId, isOwner } = useWorkspace();
+  const { plan, isLoading: planLoading } = usePlan();
+  const queryClient = useQueryClient();
+  const [detail, setDetail] = useState<Campaign | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Campaign | null>(null);
+
+  const { data: campaigns, isLoading, error, refetch } = useQuery({
     queryKey: ["campaigns", workspaceOwnerId],
-    queryFn: async () => {
-      if (!workspaceOwnerId) return [];
-      const { data, error } = await supabase
+    enabled: !!workspaceOwnerId,
+    queryFn: async (): Promise<Campaign[]> => {
+      const { data, error: queryError } = await supabase
         .from("campaigns")
         .select("*")
-        .eq("user_id", workspaceOwnerId)
+        .eq("user_id", workspaceOwnerId!)
         .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      if (queryError) throw queryError;
+      return data ?? [];
     },
-    enabled: !!workspaceOwnerId && !isDemoMode,
   });
 
-  // SMS sent this month (count of sent campaign_jobs created this month)
-  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-  const { data: monthlySent = 0 } = useQuery({
-    queryKey: ["sms-sent-month", workspaceOwnerId, monthStart],
-    enabled: !!workspaceOwnerId && !isDemoMode,
+  // Texts queued this calendar month. This is what the plan's allowance counts.
+  const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString();
+  const { data: usedThisMonth } = useQuery({
+    queryKey: ["campaigns", workspaceOwnerId, "month-usage", monthStart],
+    enabled: !!workspaceOwnerId && isOwner,
     queryFn: async () => {
-      const { count, error } = await supabase
+      const { count, error: countError } = await supabase
         .from("campaign_jobs")
         .select("id", { count: "exact", head: true })
         .eq("user_id", workspaceOwnerId!)
-        .in("status", ["sent", "delivered", "failed", "undelivered"])
         .gte("created_at", monthStart);
-      if (error) throw error;
+      if (countError) throw countError;
       return count ?? 0;
     },
   });
 
-  // Detail: jobs status counts
   const { data: detailJobs } = useQuery({
-    queryKey: ["campaign-job-stats", detailCampaign?.id],
-    enabled: !!detailCampaign && !isDemoMode,
+    queryKey: ["campaigns", "job-status", detail?.id],
+    enabled: !!detail && detail.status !== "draft",
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("campaign_jobs")
-        .select("status")
-        .eq("campaign_id", detailCampaign!.id);
-      if (error) throw error;
+      const { data, error: jobsError } = await supabase.from("campaign_jobs").select("status").eq("campaign_id", detail!.id);
+      if (jobsError) throw jobsError;
       const counts: Record<string, number> = {};
-      for (const r of data ?? []) {
-        const s = (r as any).status ?? "pending";
-        counts[s] = (counts[s] ?? 0) + 1;
-      }
+      for (const row of data ?? []) counts[row.status] = (counts[row.status] ?? 0) + 1;
       return counts;
     },
   });
 
+  // Counts change as carriers confirm delivery. Refresh when the database says so.
   useEffect(() => {
-    if (!workspaceOwnerId || isDemoMode) return;
+    if (!workspaceOwnerId) return;
     const channel = supabase
-      .channel("campaigns-changes")
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "campaigns", filter: `user_id=eq.${workspaceOwnerId}` },
-        () => queryClient.invalidateQueries({ queryKey: ["campaigns", workspaceOwnerId] })
-      )
+      .channel(`campaigns-${workspaceOwnerId}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "campaigns", filter: `user_id=eq.${workspaceOwnerId}` }, () => {
+        void queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [workspaceOwnerId, isDemoMode, queryClient]);
-
-  const loading = isDemoMode ? false : isLoading;
-  const campaigns = isDemoMode ? MOCK_CAMPAIGNS : (realCampaigns ?? []);
-
-  const totalSentThisMonth = isDemoMode
-    ? campaigns.reduce((sum, c) => sum + (c.sent_count ?? 0), 0)
-    : monthlySent;
-  const planKey = (plan ?? "free").toLowerCase();
-  const monthlyLimit = isDemoMode ? 500 : PLAN_SMS_LIMITS[planKey] ?? 0;
-  const isUnlimited = !isDemoMode && monthlyLimit === null;
-
-  const campaignsWithSent = campaigns.filter((c) => (c.sent_count ?? 0) > 0);
-  const avgResponseRate = campaignsWithSent.length > 0
-    ? Math.round(campaignsWithSent.reduce((sum, c) => sum + ((c.completed_count ?? 0) / (c.sent_count ?? 1)) * 100, 0) / campaignsWithSent.length)
-    : 0;
-
-  const totalCompleted = campaigns.reduce((sum, c) => sum + (c.completed_count ?? 0), 0);
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  };
-
-  const getStatusBadge = (status: string) => {
-    const map: Record<string, string> = {
-      active: "bg-success text-white",
-      completed: "bg-primary text-primary-foreground",
-      draft: "",
-      scheduled: "bg-warning text-white",
-      paused: "bg-muted text-muted-foreground",
+    return () => {
+      void supabase.removeChannel(channel);
     };
-    return map[status] ?? "";
-  };
+  }, [workspaceOwnerId, queryClient]);
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error: deleteError } = await supabase.from("campaigns").delete().eq("id", id);
+      if (deleteError) throw deleteError;
+    },
+    onSuccess: () => {
+      toast.success("Campaign deleted");
+      void queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+    },
+    onError: () => toast.error("The campaign was not deleted. Only the account owner can delete campaigns."),
+  });
+
+  const list = campaigns ?? [];
+  const allowance = SMS_MONTHLY_ALLOWANCE[plan] ?? 0;
+  const attempted = list.reduce((sum, c) => sum + (c.sent_count ?? 0), 0);
+  const delivered = list.reduce((sum, c) => sum + (c.delivered_count ?? 0), 0);
+
+  const newButton = (
+    <Button asChild>
+      <Link to="/dashboard/campaigns/new">
+        <Plus className="mr-1.5 h-4 w-4" />
+        New campaign
+      </Link>
+    </Button>
+  );
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        {/* Header */}
-        <div className="flex items-end justify-between mb-8">
-          <div>
-            <h1 className="text-[22px] font-semibold tracking-tight text-foreground">SMS Campaigns</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              <span className="tabular-nums">{campaigns.length}</span> total
-              <span className="mx-1.5 text-border">·</span>
-              <span className="tabular-nums">{totalCompleted}</span> testimonials collected
-            </p>
-          </div>
-          <Button size="sm" onClick={() => navigate("/dashboard/campaigns/new")}>
-            <Plus className="w-4 h-4 mr-1.5" />
-            New Campaign
-          </Button>
+    <PageContainer>
+      <PageHeader
+        title="Text campaigns"
+        description="Text your form link to a list of clients. Only text people who agreed to hear from you."
+        actions={newButton}
+      />
+
+      {!planLoading && allowance === 0 && (
+        <div className="mb-6 rounded-2xl border border-gold/40 bg-gold-light/60 px-5 py-4 text-sm text-foreground">
+          Text campaigns are part of the Starter plan and up. You can build and save a campaign now, and send it after you upgrade.{" "}
+          <Link to="/dashboard/settings/billing" className="font-medium underline underline-offset-4">
+            See plans
+          </Link>
         </div>
+      )}
 
-        {loading ? (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[1, 2, 3].map((i) => (
-                <Card key={i}><CardContent className="p-6"><Skeleton className="h-20 w-full" /></CardContent></Card>
-              ))}
-            </div>
-            <Card><CardContent className="p-6"><Skeleton className="h-40 w-full" /></CardContent></Card>
+      {error ? (
+        <ErrorState title="Your campaigns did not load" error={error} onRetry={() => void refetch()} />
+      ) : isLoading ? (
+        <div className="space-y-3" role="status" aria-label="Loading campaigns">
+          <Skeleton className="h-24 rounded-2xl" />
+          <Skeleton className="h-24 rounded-2xl" />
+        </div>
+      ) : list.length === 0 ? (
+        <EmptyState
+          icon={MessageSquareText}
+          title="Ask by text message"
+          description="Paste a list of mobile numbers, write one short message, and every client gets your form link. Most people read a text within minutes."
+          actions={newButton}
+        />
+      ) : (
+        <>
+          <div className={cn("mb-6 grid gap-3", isOwner && allowance !== 0 ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
+            {isOwner && allowance !== 0 && (
+              <Tile
+                label="Texts this month"
+                value={(usedThisMonth ?? 0).toLocaleString()}
+                note={allowance === null ? "Your plan has no monthly cap." : `Your plan includes ${allowance.toLocaleString()} each month.`}
+              />
+            )}
+            <Tile label="Delivered" value={delivered.toLocaleString()} note="Confirmed by the phone carrier, all time." />
+            <Tile
+              label="Delivery rate"
+              value={attempted > 0 ? `${Math.round((delivered / attempted) * 100)}%` : "No data"}
+              note={attempted > 0 ? `Of ${pluralize(attempted, "text")} sent.` : "Shows after your first campaign goes out."}
+            />
           </div>
-        ) : campaigns.length === 0 ? (
-          <div className="text-center py-24 border border-dashed border-border rounded-xl">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-light mb-4">
-              <Megaphone className="w-5 h-5 text-primary" />
-            </div>
-            <h3 className="text-base font-semibold text-foreground mb-1.5">No campaigns yet</h3>
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-5">
-              Send your first SMS campaign and get 3x more testimonials than email.
-            </p>
-            <Button size="sm" onClick={() => navigate("/dashboard/campaigns/new")}>
-              <Plus className="w-4 h-4 mr-1.5" />
-              Create Campaign
-            </Button>
-          </div>
-        ) : (
-          <>
-            {/* Stats Row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-8">
-              <Card className="bg-card border border-border rounded-xl shadow-none">
-                <CardContent className="p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Send className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">SMS sent this month</span>
-                  </div>
-                  <div className="flex items-baseline gap-1.5 mb-3">
-                    <span className="text-2xl font-semibold text-foreground tabular-nums">{totalSentThisMonth}</span>
-                    <span className="text-sm text-muted-foreground tabular-nums">
-                      / {isUnlimited ? "Unlimited" : (monthlyLimit ?? 0)}
-                    </span>
-                  </div>
-                  <Progress
-                    value={isUnlimited || !monthlyLimit ? 0 : Math.min(100, (totalSentThisMonth / monthlyLimit) * 100)}
-                    className="h-1"
-                  />
-                </CardContent>
-              </Card>
 
-              <Card className="bg-card border border-border rounded-xl shadow-none">
-                <CardContent className="p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Response rate</span>
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-semibold text-foreground tabular-nums">{avgResponseRate}%</span>
-                    {avgResponseRate >= 30 && (
-                      <span className="text-[10px] uppercase tracking-wider font-medium text-success">Above avg</span>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card border border-border rounded-xl shadow-none">
-                <CardContent className="p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <MessageSquare className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Testimonials from SMS</span>
-                  </div>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-2xl font-semibold text-foreground tabular-nums">{totalCompleted}</span>
-                    <span className="text-xs text-muted-foreground">collected</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Campaigns Table */}
-            <Card className="bg-card border border-border rounded-xl overflow-hidden shadow-none">
-              <div className="px-5 py-3 border-b border-border">
-                <h2 className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Your Campaigns</h2>
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Campaign</TableHead>
-                    <TableHead className="text-center">Recipients</TableHead>
-                    <TableHead className="text-center">Delivered</TableHead>
-                    <TableHead className="text-center">Completed</TableHead>
-                    <TableHead className="text-center">Response Rate</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {campaigns.map((campaign) => {
-                    const responseRate = (campaign.sent_count ?? 0) > 0
-                      ? Math.round(((campaign.completed_count ?? 0) / (campaign.sent_count ?? 1)) * 100)
-                      : 0;
-                    const total = campaign.total_recipients ?? 0;
-                    const completed = campaign.completed_count ?? 0;
-                    const progressPct = total > 0 ? Math.min(100, (completed / total) * 100) : 0;
-                    const inFlight = campaign.status === "active" && completed < total;
-                    const scheduledFuture =
-                      campaign.status === "scheduled" && campaign.scheduled_at && new Date(campaign.scheduled_at) > new Date();
-                    const status = campaign.status ?? "draft";
-                    const dotColor =
-                      status === "active" ? "bg-success" :
-                      status === "completed" ? "bg-primary" :
-                      status === "scheduled" ? "bg-warning" :
-                      status === "paused" ? "bg-muted-foreground/60" :
-                      "bg-muted-foreground/40";
-                     return (
-                      <TableRow
-                        key={campaign.id}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => setDetailCampaign(campaign)}
-                      >
-                        <TableCell>
-                          <div>
-                            <div className="font-medium text-foreground">{campaign.name}</div>
-                            <div className="text-xs text-muted-foreground tabular-nums mt-0.5">{formatDate(campaign.created_at)}</div>
-                            {(inFlight || progressPct > 0) && total > 0 && (
-                              <div className="mt-2 max-w-[220px]">
-                                <Progress value={progressPct} className="h-1" />
-                                <div className="text-xs text-muted-foreground mt-1 tabular-nums">
-                                  {completed} / {total} delivered
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center tabular-nums">
-                          <div className="flex items-center justify-center gap-1">
-                            <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                            {campaign.total_recipients ?? 0}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center tabular-nums">{campaign.delivered_count ?? 0}</TableCell>
-                        <TableCell className="text-center tabular-nums">{campaign.completed_count ?? 0}</TableCell>
-                        <TableCell className="text-center tabular-nums">
-                          <span className={responseRate >= 30 ? "text-success font-medium" : "text-foreground"}>
-                            {responseRate}%
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-medium text-muted-foreground">
-                            <span className={`inline-block w-1.5 h-1.5 rounded-full ${dotColor}`} aria-hidden />
-                            {scheduledFuture
-                              ? `Scheduled ${new Date(campaign.scheduled_at!).toLocaleDateString()}`
-                              : inFlight
-                                ? "Sending"
-                                : status}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </Card>
-          </>
-        )}
-
-        {campaignsError && !isDemoMode && (
-          <div className="text-center py-16 border border-dashed border-destructive/30 rounded-xl mt-6">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-destructive/10 mb-4">
-              <AlertCircle className="w-5 h-5 text-destructive" />
-            </div>
-            <h3 className="text-base font-semibold text-foreground mb-1.5">Couldn't load campaigns</h3>
-            <p className="text-sm text-muted-foreground mb-5">{campaignsError instanceof Error ? campaignsError.message : "Something went wrong."}</p>
-            <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
-          </div>
-        )}
-
-        <Dialog open={!!detailCampaign} onOpenChange={(open) => !open && setDetailCampaign(null)}>
-          <DialogContent className="max-w-md">
-            {detailCampaign && (
-              <>
-                <DialogHeader>
-                  <DialogTitle className="text-base">{detailCampaign.name}</DialogTitle>
-                  <DialogDescription>
-                    {formatDate(detailCampaign.created_at)} · {detailCampaign.status ?? "draft"}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-3 mt-2">
-                  <div className="grid grid-cols-3 gap-3 text-center">
-                    <div className="rounded-lg border border-border p-3">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Recipients</div>
-                      <div className="text-lg font-semibold tabular-nums mt-1">{detailCampaign.total_recipients ?? 0}</div>
+          <ul className="space-y-3">
+            {list.map((campaign) => {
+              const state = campaignState(campaign);
+              const total = campaign.total_recipients ?? 0;
+              const isDraft = (campaign.status ?? "draft") === "draft";
+              const canDelete = isOwner && (isDraft || campaign.status === "scheduled" || campaign.status === "paused");
+              return (
+                <li key={campaign.id} className="rounded-2xl border border-border bg-card p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="truncate text-base font-semibold text-foreground">{campaign.name}</h2>
+                        <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium", TONES[state.tone])}>{state.label}</span>
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {pluralize(total, "person", "people")} · Created {formatDate(campaign.created_at)}
+                      </p>
                     </div>
-                    <div className="rounded-lg border border-border p-3">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Delivered</div>
-                      <div className="text-lg font-semibold tabular-nums mt-1">{detailCampaign.delivered_count ?? 0}</div>
-                    </div>
-                    <div className="rounded-lg border border-border p-3">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Completed</div>
-                      <div className="text-lg font-semibold tabular-nums mt-1">{detailCampaign.completed_count ?? 0}</div>
-                    </div>
-                  </div>
-                  {!isDemoMode && (
-                    <div>
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Job statuses</div>
-                      {detailJobs && Object.keys(detailJobs).length > 0 ? (
-                        <div className="grid grid-cols-2 gap-2">
-                          {Object.entries(detailJobs).map(([status, count]) => (
-                            <div key={status} className="flex items-center justify-between text-sm border border-border rounded-md px-3 py-1.5">
-                              <span className="text-muted-foreground capitalize">{status}</span>
-                              <span className="tabular-nums font-medium">{count}</span>
-                            </div>
-                          ))}
-                        </div>
+                    <div className="flex items-center gap-1.5">
+                      {isDraft ? (
+                        <Button asChild variant="outline" size="sm">
+                          <Link to={`/dashboard/campaigns/new?draft=${campaign.id}`}>
+                            <PenLine className="mr-1.5 h-3.5 w-3.5" />
+                            Continue
+                          </Link>
+                        </Button>
                       ) : (
-                        <p className="text-sm text-muted-foreground">No jobs yet.</p>
+                        <Button variant="outline" size="sm" onClick={() => setDetail(campaign)}>
+                          Details
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(campaign)} aria-label={`Delete ${campaign.name}`}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       )}
                     </div>
+                  </div>
+
+                  {!isDraft && campaign.status !== "scheduled" && (
+                    <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-4 text-sm">
+                      {[
+                        { label: "Sent", value: campaign.sent_count ?? 0 },
+                        { label: "Delivered", value: campaign.delivered_count ?? 0 },
+                        { label: "Failed", value: Math.max(0, (campaign.completed_count ?? 0) - (campaign.delivered_count ?? 0)) },
+                      ].map((stat) => (
+                        <div key={stat.label}>
+                          <dt className="text-xs text-muted-foreground">{stat.label}</dt>
+                          <dd className="mt-0.5 font-semibold tabular-nums text-foreground">{stat.value.toLocaleString()}</dd>
+                        </div>
+                      ))}
+                    </dl>
                   )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+
+      <Dialog open={!!detail} onOpenChange={(open) => !open && setDetail(null)}>
+        <DialogContent className="max-w-md">
+          {detail && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{detail.name}</DialogTitle>
+                <DialogDescription>
+                  {campaignState(detail).label} · {pluralize(detail.total_recipients ?? 0, "person", "people")}
+                </DialogDescription>
+              </DialogHeader>
+              {detail.message_template && (
+                <div>
+                  <p className="eyebrow mb-2">Message</p>
+                  <p className="whitespace-pre-wrap rounded-xl bg-muted/50 px-4 py-3 text-sm text-foreground">{detail.message_template}</p>
                 </div>
-              </>
-            )}
-          </DialogContent>
-        </Dialog>
-      </div>
-    </div>
+              )}
+              <div>
+                <p className="eyebrow mb-2">Where the texts stand</p>
+                {detailJobs && Object.keys(detailJobs).length > 0 ? (
+                  <ul className="divide-y divide-border rounded-xl border border-border">
+                    {Object.entries(detailJobs).map(([status, count]) => (
+                      <li key={status} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                        <span className="text-muted-foreground">{JOB_LABELS[status] ?? status}</span>
+                        <span className="font-medium tabular-nums text-foreground">{count.toLocaleString()}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {isOwner ? "No texts in the queue for this campaign." : "Only the account owner can see each text."}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deleteTarget?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.status === "scheduled"
+                ? "The scheduled texts are cancelled and nothing is sent."
+                : "The campaign and its list of numbers are removed."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteTarget) remove.mutate(deleteTarget.id);
+                setDeleteTarget(null);
+              }}
+            >
+              Delete campaign
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </PageContainer>
   );
 }

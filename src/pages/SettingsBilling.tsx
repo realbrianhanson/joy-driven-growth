@@ -1,66 +1,80 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, Check, Loader2, AlertCircle } from "lucide-react";
+import { Check, ExternalLink, Info, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
-import { useSubscription } from "@/hooks/use-subscription";
-import { useWorkspace } from "@/hooks/use-workspace";
+import { Skeleton } from "@/components/ui/skeleton";
 import SettingsLayout from "@/components/settings/SettingsLayout";
 import { supabase } from "@/integrations/supabase/client";
-import { PLANS } from "@/lib/billing-plans";
+import { useSubscription } from "@/hooks/use-subscription";
+import { useWorkspace } from "@/hooks/use-workspace";
+import { PLANS, type PlanId } from "@/lib/billing-plans";
 import { SALES_EMAIL } from "@/lib/config";
+import { formatDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
-const SettingsBilling = () => {
-  const { toast } = useToast();
-  const { user } = useAuth();
-  const { workspaceOwnerId } = useWorkspace();
+const PLAN_ORDER: PlanId[] = ["free", "starter", "pro", "scale"];
+
+const STATUS_LABELS: Record<string, string> = {
+  active: "Active",
+  trialing: "Trial",
+  past_due: "Payment problem",
+  unpaid: "Payment problem",
+  canceled: "Cancelled",
+  incomplete: "Payment not finished",
+};
+
+function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+      <h2 className="eyebrow mb-4">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+export default function SettingsBilling() {
+  const { workspaceOwnerId, isTeamMember } = useWorkspace();
   const subscription = useSubscription();
-  const [checkingOut, setCheckingOut] = useState<string | null>(null);
+  const [checkingOut, setCheckingOut] = useState<PlanId | null>(null);
   const [openingPortal, setOpeningPortal] = useState(false);
 
   const { data: usage, isLoading: usageLoading } = useQuery({
     queryKey: ["billing-usage", workspaceOwnerId],
     enabled: !!workspaceOwnerId,
     queryFn: async () => {
-      const [t, w] = await Promise.all([
+      const [testimonials, widgets, walls] = await Promise.all([
         supabase.from("testimonials").select("id", { count: "exact", head: true }).eq("user_id", workspaceOwnerId!),
         supabase.from("widgets").select("id", { count: "exact", head: true }).eq("user_id", workspaceOwnerId!),
+        supabase.from("walls").select("id", { count: "exact", head: true }).eq("user_id", workspaceOwnerId!),
       ]);
-      return { testimonials: t.count ?? 0, widgets: w.count ?? 0 };
+      return { testimonials: testimonials.count ?? 0, widgets: widgets.count ?? 0, walls: walls.count ?? 0 };
     },
   });
 
-  const startCheckout = async (priceId: string | null, planName: string) => {
-    if (!priceId || priceId.startsWith("price_REPLACE_ME")) {
-      toast({
-        title: "Upgrades aren't available yet",
-        description: `Email ${SALES_EMAIL} and we'll get you set up.`,
-        variant: "destructive",
-      });
+  // Checkout works only after real Stripe price IDs replace the placeholders.
+  const checkoutOpen = !!PLANS.starter.priceId && !PLANS.starter.priceId.startsWith("price_REPLACE_ME");
+  const contactSales = () => toast.error(`Online checkout is not open yet. Email ${SALES_EMAIL} to upgrade.`);
+
+  const startCheckout = async (planId: PlanId) => {
+    const priceId = PLANS[planId].priceId;
+    if (!checkoutOpen || !priceId) {
+      contactSales();
       return;
     }
-    setCheckingOut(planName);
+    setCheckingOut(planId);
     try {
-      const { data, error } = await supabase.functions.invoke("create-checkout-session", {
-        body: { price_id: priceId },
-      });
+      const { data, error } = await supabase.functions.invoke("create-checkout-session", { body: { price_id: priceId } });
       if (error) throw error;
-      const payload = data as { url?: string; error?: string };
-      if (payload?.error) {
-        toast({
-          title: "Upgrades aren't available yet",
-          description: `Email ${SALES_EMAIL} and we'll help you upgrade.`,
-          variant: "destructive",
-        });
+      const payload = data as { url?: string; error?: string } | null;
+      if (payload?.url) {
+        window.location.href = payload.url;
         return;
       }
-      if (payload?.url) window.location.href = payload.url;
+      contactSales();
     } catch (err) {
-      toast({ title: "Couldn't start checkout", description: err instanceof Error ? err.message : "", variant: "destructive" });
+      console.error("Checkout failed:", err);
+      toast.error(`Checkout did not start. Try again, or email ${SALES_EMAIL}.`);
     } finally {
       setCheckingOut(null);
     }
@@ -71,148 +85,173 @@ const SettingsBilling = () => {
     try {
       const { data, error } = await supabase.functions.invoke("create-customer-portal");
       if (error) throw error;
-      const payload = data as { url?: string; error?: string };
-      if (payload?.error) {
-        toast({ title: "Couldn't open portal", description: payload.error, variant: "destructive" });
+      const payload = data as { url?: string; error?: string } | null;
+      if (payload?.url) {
+        window.location.href = payload.url;
         return;
       }
-      if (payload?.url) window.location.href = payload.url;
+      throw new Error(payload?.error ?? "no_url");
     } catch (err) {
-      toast({ title: "Couldn't open portal", description: err instanceof Error ? err.message : "", variant: "destructive" });
+      console.error("Billing portal failed:", err);
+      toast.error(`The billing page did not open. Try again, or email ${SALES_EMAIL}.`);
     } finally {
       setOpeningPortal(false);
     }
   };
 
-  const currentPlan = PLANS[subscription.plan] ?? PLANS.free;
-  const renewal = subscription.currentPeriodEnd
-    ? new Date(subscription.currentPeriodEnd).toLocaleDateString()
-    : null;
+  if (isTeamMember) {
+    return (
+      <SettingsLayout>
+        <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-5">
+          <Info className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">The account owner manages billing</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Ask the person who invited you to change the plan or the payment method.</p>
+          </div>
+        </div>
+      </SettingsLayout>
+    );
+  }
 
-  const upgradesEnabled = !!(PLANS.starter.priceId && !PLANS.starter.priceId.startsWith("price_REPLACE_ME"));
+  const currentPlan = PLANS[subscription.plan] ?? PLANS.free;
+  const statusLabel = STATUS_LABELS[subscription.status];
+  const stats = [
+    { label: "Testimonials", value: usage?.testimonials ?? 0 },
+    { label: "Widgets", value: usage?.widgets ?? 0 },
+    { label: "Walls", value: usage?.walls ?? 0 },
+  ];
 
   return (
     <SettingsLayout>
-      {!upgradesEnabled && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 mb-6 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
-          <div>
-            <h3 className="font-semibold text-foreground">Upgrades aren't available yet</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Self-serve checkout is coming soon. Want to upgrade now? Email{" "}
-              <a href={`mailto:${SALES_EMAIL}`} className="text-primary underline">{SALES_EMAIL}</a> and we'll get you set up.
-            </p>
-          </div>
-        </div>
-      )}
-
       <div className="space-y-6">
-        <Card>
-          <CardHeader><CardTitle>Current plan</CardTitle></CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between flex-wrap gap-4">
+        {!checkoutOpen && (
+          <div className="flex items-start gap-3 rounded-2xl border border-gold/40 bg-gold-light/60 p-5">
+            <Info className="mt-0.5 h-5 w-5 shrink-0 text-gold-deep" />
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Online checkout is not open yet</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                To move to a paid plan now, email{" "}
+                <a href={`mailto:${SALES_EMAIL}`} className="font-medium text-foreground underline underline-offset-4">
+                  {SALES_EMAIL}
+                </a>{" "}
+                and we will set you up.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <Panel title="Your plan">
+          {subscription.isLoading ? (
+            <Skeleton className="h-14 w-64" />
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <div className="flex items-baseline gap-2 mb-2">
-                  <span className="text-2xl font-bold text-foreground">{currentPlan.name}</span>
-                  <Badge variant={subscription.isActive ? "default" : "secondary"}>{subscription.status}</Badge>
-                  {subscription.cancelAtPeriodEnd && <Badge variant="destructive">Cancels at period end</Badge>}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span className="display text-3xl text-foreground">{currentPlan.name}</span>
+                  {statusLabel && (
+                    <span
+                      className={cn(
+                        "rounded-full px-2.5 py-0.5 text-xs font-medium",
+                        subscription.isActive ? "bg-success-light text-success" : "bg-warning-light text-warning",
+                      )}
+                    >
+                      {statusLabel}
+                    </span>
+                  )}
                 </div>
-                {renewal && (
-                  <p className="text-sm text-muted-foreground">
-                    {subscription.cancelAtPeriodEnd ? "Ends" : "Renews"} on {renewal}
+                {subscription.currentPeriodEnd && (
+                  <p className="mt-1.5 text-sm text-muted-foreground">
+                    {subscription.cancelAtPeriodEnd ? "Ends" : "Renews"} on {formatDate(subscription.currentPeriodEnd)}
                   </p>
                 )}
               </div>
               {subscription.hasStripeCustomer && (
                 <Button variant="outline" onClick={openPortal} disabled={openingPortal}>
-                  {openingPortal ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ExternalLink className="w-4 h-4 mr-2" />}
-                  Manage subscription
+                  {openingPortal ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
+                  Manage payment and invoices
                 </Button>
               )}
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </Panel>
 
-        <Card>
-          <CardHeader><CardTitle>Usage</CardTitle></CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground mb-4">Lifetime totals for this workspace.</p>
-            {usageLoading ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
-            ) : (
-              <div className="space-y-4">
-                {[
-                  { label: "Testimonials", value: usage?.testimonials ?? 0, limit: subscription.plan === "free" ? 25 : null },
-                  { label: "Widgets", value: usage?.widgets ?? 0, limit: subscription.plan === "free" ? 1 : 5 },
-                ].map((u) => (
-                  <div key={u.label}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-foreground">{u.label}</span>
-                      <span className="text-muted-foreground">{u.value}{u.limit != null && ` / ${u.limit}`}</span>
-                    </div>
-                    {u.limit != null && <Progress value={Math.min(100, (u.value / u.limit) * 100)} />}
-                  </div>
-                ))}
+        <Panel title="In this account">
+          <dl className="grid grid-cols-3 gap-3">
+            {stats.map((stat) => (
+              <div key={stat.label} className="rounded-xl border border-border bg-background/60 px-4 py-3">
+                <dd className="display text-3xl tabular-nums text-foreground">
+                  {usageLoading ? <Skeleton className="h-8 w-12" /> : stat.value.toLocaleString()}
+                </dd>
+                <dt className="mt-1 text-xs text-muted-foreground">{stat.label}</dt>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            ))}
+          </dl>
+        </Panel>
 
-        <Card>
-          <CardHeader><CardTitle>Available plans</CardTitle></CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {(["free", "starter", "pro", "scale"] as const).map((id) => {
-                const plan = PLANS[id];
-                const isCurrent = subscription.plan === id && subscription.isActive;
-                return (
-                  <div key={id} className={`relative rounded-xl border p-5 ${plan.popular ? "border-primary ring-2 ring-primary/20" : "border-border"}`}>
-                    {plan.popular && (
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">
-                        Most popular
-                      </div>
-                    )}
-                    <div className="mb-1 text-sm font-medium text-muted-foreground">{plan.name}</div>
-                    <div className="flex items-baseline gap-1 mb-4">
-                      <span className="text-2xl font-bold text-foreground">{plan.price}</span>
-                      <span className="text-xs text-muted-foreground">{plan.period}</span>
-                    </div>
-                    <ul className="space-y-1.5 mb-5">
-                      {plan.features.map((f) => (
-                        <li key={f} className="flex items-start gap-1.5 text-xs text-foreground">
-                          <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
-                          <span>{f}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    {isCurrent ? (
-                      <Button variant="outline" disabled className="w-full">Current plan</Button>
-                    ) : id === "free" ? (
-                      <Button variant="outline" disabled className="w-full">Free forever</Button>
-                    ) : id === "scale" ? (
-                      <Button asChild variant="outline" className="w-full">
-                        <a href={`mailto:${SALES_EMAIL}?subject=Scale%20plan%20inquiry`}>Contact sales</a>
-                      </Button>
-                    ) : (
-                      <Button
-                        className="w-full"
-                        variant={plan.popular ? "default" : "outline"}
-                        onClick={() => startCheckout(plan.priceId, plan.name)}
-                        disabled={checkingOut === plan.name}
-                      >
-                        {checkingOut === plan.name ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                        Upgrade
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+        <Panel title="Plans">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {PLAN_ORDER.map((id) => {
+              const plan = PLANS[id];
+              const isCurrent = subscription.plan === id && (id === "free" || subscription.isActive);
+              return (
+                <div
+                  key={id}
+                  className={cn(
+                    "relative flex flex-col rounded-xl border p-5",
+                    plan.popular ? "border-foreground" : "border-border",
+                  )}
+                >
+                  {plan.popular && (
+                    <span className="absolute -top-2.5 left-5 rounded-full bg-foreground px-2.5 py-0.5 text-[0.6875rem] font-semibold text-background">
+                      Most chosen
+                    </span>
+                  )}
+                  <p className="text-sm font-medium text-muted-foreground">{plan.name}</p>
+                  <p className="mt-1 flex items-baseline gap-1">
+                    <span className="display text-3xl text-foreground">{plan.price}</span>
+                    <span className="text-xs text-muted-foreground">{plan.period}</span>
+                  </p>
+                  <ul className="mb-5 mt-4 flex-1 space-y-2">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-2 text-sm text-foreground">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-gold-deep" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {isCurrent ? (
+                    <Button variant="outline" disabled className="w-full">
+                      Your plan
+                    </Button>
+                  ) : id === "free" ? (
+                    <Button variant="outline" disabled className="w-full">
+                      Free
+                    </Button>
+                  ) : id === "scale" ? (
+                    <Button asChild variant="outline" className="w-full">
+                      <a href={`mailto:${SALES_EMAIL}?subject=Scale%20plan`}>Talk to us</a>
+                    </Button>
+                  ) : !checkoutOpen ? (
+                    <Button asChild className="w-full" variant={plan.popular ? "default" : "outline"}>
+                      <a href={`mailto:${SALES_EMAIL}?subject=${encodeURIComponent(`Upgrade to ${plan.name}`)}`}>Email us to upgrade</a>
+                    </Button>
+                  ) : (
+                    <Button
+                      className="w-full"
+                      variant={plan.popular ? "default" : "outline"}
+                      onClick={() => startCheckout(id)}
+                      disabled={checkingOut === id}
+                    >
+                      {checkingOut === id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Upgrade
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Panel>
       </div>
     </SettingsLayout>
   );
-};
-
-export default SettingsBilling;
+}

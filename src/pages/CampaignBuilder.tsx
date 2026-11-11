@@ -1,528 +1,574 @@
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Users, MessageSquare, Calendar, Send, Check, Loader2, Smartphone } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, Loader2, Send, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { useToast } from "@/hooks/use-toast";
-import { useForms } from "@/hooks/use-forms";
-import { useAuth } from "@/hooks/use-auth";
-import { useWorkspace } from "@/hooks/use-workspace";
-import { supabase } from "@/integrations/supabase/client";
-import { useDemoMode } from "@/contexts/DemoModeContext";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
+import { useForms } from "@/hooks/use-forms";
+import { usePlan } from "@/hooks/use-plan";
+import { useWorkspace } from "@/hooks/use-workspace";
+import { SMS_MONTHLY_ALLOWANCE } from "@/lib/billing-plans";
+import { PUBLIC_APP_URL } from "@/lib/config";
+import { pluralize } from "@/lib/format";
+import { MAX_RECIPIENTS, MAX_SMS_SEGMENTS, parseRecipients, recipientsToText, renderMessage, smsSize } from "@/lib/recipients";
+import { cn } from "@/lib/utils";
 
-const steps = [
-  { id: 1, title: "Setup", icon: Check },
-  { id: 2, title: "Message", icon: MessageSquare },
-  { id: 3, title: "Recipients", icon: Users },
-  { id: 4, title: "Schedule", icon: Calendar },
-];
+const STEPS = ["Form", "Message", "People", "Send"] as const;
+const DEFAULT_MESSAGE =
+  "Hi {first_name}, would you share a few words about working with us? It takes about 2 minutes: {form_link} Reply STOP to opt out.";
 
-const SMS_CHAR_LIMIT = 160;
-const SMS_HARD_LIMIT = 320;
-
-function parseRecipients(text: string): { phone: string; first_name: string }[] {
-  return text
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const parts = line.split(/[,\t]/).map((s) => s.trim());
-      const phone = parts[0];
-      const first_name = parts[1] ?? "";
-      return { phone, first_name };
-    })
-    .filter(({ phone }) => /^\+[1-9]\d{1,14}$/.test(phone));
+/** The local date and time one hour from now, in the shape a datetime-local input wants. */
+function defaultSchedule(): string {
+  const date = new Date(Date.now() + 60 * 60 * 1000);
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
 }
 
+interface StartResult {
+  ok?: boolean;
+  error?: string;
+  queued?: number;
+  status?: string;
+  remaining?: number;
+  numbers?: string[];
+  limit?: number;
+}
+
+/** Reads the JSON body of a failed function call. */
+async function readFunctionError(error: unknown): Promise<StartResult | null> {
+  const context = (error as { context?: unknown } | null)?.context;
+  if (context && typeof (context as Response).json === "function") {
+    try {
+      const body = await (context as Response).clone().json();
+      return body && typeof body.error === "string" ? (body as StartResult) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/** Says why a campaign did not start, in words the owner can act on. */
+function startErrorMessage(result: StartResult): string {
+  switch (result.error) {
+    case "sms_not_in_plan":
+      return "Text campaigns are part of the Starter plan and up.";
+    case "sms_allowance_exceeded":
+      return `Your plan has ${pluralize(result.remaining ?? 0, "text")} left this month. Shorten the list, or move to a bigger plan.`;
+    case "country_not_allowed":
+      return `Texts to these numbers are not turned on yet: ${(result.numbers ?? []).join(", ")}. Only US and Canada numbers can be sent to.`;
+    case "sms_not_configured":
+    case "unreachable":
+      return "Text messages are not set up for this app yet.";
+    case "form_not_ready":
+      return "The form for this campaign is not published. Publish it, then send.";
+    case "message_too_long":
+      return "The message is too long once a name and the link are filled in. Shorten it.";
+    case "missing_form_link":
+      return "Add {form_link} to the message so clients can reach your form.";
+    case "too_many_recipients":
+      return `One campaign can go to ${(result.limit ?? MAX_RECIPIENTS).toLocaleString()} people. Split the list.`;
+    case "no_recipients":
+      return "The list has no usable phone numbers.";
+    case "campaign_already_started":
+      return "This campaign has already started.";
+    case "rate_limited":
+      return "Too many tries in a row. Wait a minute, then send again.";
+    case "forbidden":
+      return "You have view-only access, so you cannot send campaigns.";
+    default:
+      return "The campaign did not start.";
+  }
+}
+
+/** Four short steps to text a form link to a list of clients. A draft can be saved and finished later. */
 export default function CampaignBuilder() {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const draftId = searchParams.get("draft");
   const { workspaceOwnerId } = useWorkspace();
+  const { plan, isLoading: planLoading } = usePlan();
+  const allowance = SMS_MONTHLY_ALLOWANCE[plan] ?? 0;
   const { data: forms, isLoading: formsLoading } = useForms();
-  const { isDemoMode } = useDemoMode();
-  const [demoBlockOpen, setDemoBlockOpen] = useState(false);
 
-  const [currentStep, setCurrentStep] = useState(1);
-
-  // Step 1 - Setup
-  const [campaignName, setCampaignName] = useState("");
-  const [selectedFormId, setSelectedFormId] = useState("");
-
-  // Step 2 - Message
-  const [message, setMessage] = useState(
-    "Hey {first_name}! 👋 Quick favor - would you share your experience with us? Takes 60 sec: {form_link} Reply STOP to opt out."
-  );
-
-  // Step 3 - Recipients
+  const [step, setStep] = useState(0);
+  const [name, setName] = useState("");
+  const [formId, setFormId] = useState("");
+  const [message, setMessage] = useState(DEFAULT_MESSAGE);
   const [recipientsText, setRecipientsText] = useState("");
-
-  // Step 4 - Schedule
   const [timing, setTiming] = useState<"now" | "scheduled">("now");
-  const [scheduledDate, setScheduledDate] = useState("");
+  const [scheduledAt, setScheduledAt] = useState(defaultSchedule);
+  const [confirmedConsent, setConfirmedConsent] = useState(false);
+  const [busy, setBusy] = useState<null | "draft" | "send">(null);
 
-  // Sending state
-  const [isSaving, setIsSaving] = useState(false);
-  const [isSending, setIsSending] = useState(false);
+  const { data: draft, isLoading: draftLoading } = useQuery({
+    queryKey: ["campaign-draft", draftId],
+    enabled: !!draftId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("campaigns").select("*").eq("id", draftId!).eq("status", "draft").maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
 
-  const validRecipients = parseRecipients(recipientsText);
-  const selectedForm = forms?.find((f) => f.id === selectedFormId);
-  const formLink = selectedForm
-    ? `${window.location.origin}/collect/${selectedForm.slug}`
-    : "{form_link}";
+  useEffect(() => {
+    if (!draft) return;
+    setName(draft.name ?? "");
+    setFormId(draft.form_id ?? "");
+    if (draft.message_template) setMessage(draft.message_template);
+    setRecipientsText(recipientsToText(draft.recipients));
+  }, [draft]);
 
-  const previewMessage = message
-    .replace(/\{first_name\}/g, "Sarah")
-    .replace(/\{form_link\}/g, formLink);
+  const publishedForms = useMemo(() => (forms ?? []).filter((form) => form.is_published), [forms]);
+  const selectedForm = publishedForms.find((form) => form.id === formId) ?? null;
+  const formLink = selectedForm ? `${PUBLIC_APP_URL}/collect/${selectedForm.slug}` : `${PUBLIC_APP_URL}/collect/your-form`;
 
-  const insertVariable = (v: string) => {
-    setMessage((prev) => prev + v);
-  };
+  const recipients = useMemo(() => parseRecipients(recipientsText), [recipientsText]);
+  const outsideNorthAmerica = recipients.valid.filter((person) => !person.phone.startsWith("+1")).length;
+  const preview = renderMessage(message, "Sarah", formLink);
+  const size = smsSize(preview);
+  const tooLong = size.segments > MAX_SMS_SEGMENTS;
+  const hasLink = message.includes("{form_link}");
+  const scheduleTime = timing === "scheduled" ? new Date(scheduledAt).getTime() : null;
+  const scheduleInPast = scheduleTime !== null && (!Number.isFinite(scheduleTime) || scheduleTime < Date.now());
 
-  const estimatedLength = useMemo(() => previewMessage.length, [previewMessage]);
-  const overHardLimit = estimatedLength > SMS_HARD_LIMIT;
+  const problems: (string | null)[] = [
+    !name.trim() ? "Give the campaign a name." : !selectedForm ? "Pick the form your clients will fill in." : null,
+    !message.trim()
+      ? "Write a message."
+      : !hasLink
+        ? "Add {form_link} so clients can reach your form."
+        : tooLong
+          ? `The message is too long. Shorten it to ${MAX_SMS_SEGMENTS} texts or fewer.`
+          : null,
+    recipients.valid.length === 0
+      ? "Add at least one phone number."
+      : recipients.valid.length > MAX_RECIPIENTS
+        ? `One campaign can go to ${MAX_RECIPIENTS.toLocaleString()} people. Split the list.`
+        : null,
+    scheduleInPast ? "Pick a time in the future." : !confirmedConsent ? "Confirm that these clients agreed to get texts from you." : null,
+  ];
+  const firstProblemStep = problems.findIndex((problem) => problem !== null);
+  const canOpen = (target: number) => target <= step || problems.slice(0, target).every((problem) => problem === null);
 
-  const isStepValid = (step: number) => {
-    switch (step) {
-      case 1: return campaignName.trim().length > 0 && selectedFormId.length > 0;
-      case 2: return message.trim().length > 0 && !overHardLimit;
-      case 3: return validRecipients.length > 0;
-      case 4: return timing === "now" || (timing === "scheduled" && scheduledDate.length > 0);
-      default: return true;
-    }
-  };
-  const canProceed = () => isStepValid(currentStep);
-  const canJumpTo = (target: number) => {
-    if (target <= currentStep) return true;
-    for (let s = 1; s < target; s++) if (!isStepValid(s)) return false;
-    return true;
-  };
-  const allValid = isStepValid(1) && isStepValid(2) && isStepValid(3) && isStepValid(4);
+  const campaignFields = (status: "draft") => ({
+    user_id: workspaceOwnerId!,
+    name: name.trim(),
+    form_id: formId || null,
+    type: "sms" as const,
+    status,
+    message_template: message,
+    recipients: recipients.valid as never,
+    total_recipients: recipients.valid.length,
+    scheduled_at: null,
+  });
 
-  const saveCampaign = async (status: "draft" | "active" | "scheduled") => {
-    if (!workspaceOwnerId) return null;
-    const { data, error } = await supabase
-      .from("campaigns")
-      .insert({
-        user_id: workspaceOwnerId,
-        name: campaignName,
-        form_id: selectedFormId || null,
-        type: "sms" as const,
-        status,
-        message_template: message,
-        recipients: validRecipients,
-        total_recipients: validRecipients.length,
-        scheduled_at: timing === "scheduled" && scheduledDate ? new Date(scheduledDate).toISOString() : null,
-      })
-      .select()
-      .single();
+  /** Saves the campaign: updates the open draft, or creates a new row. */
+  const saveCampaign = async (status: "draft") => {
+    const query = draft
+      ? supabase.from("campaigns").update(campaignFields(status)).eq("id", draft.id).select().single()
+      : supabase.from("campaigns").insert(campaignFields(status)).select().single();
+    const { data, error } = await query;
     if (error) throw error;
     return data;
   };
 
-  const handleSaveDraft = async () => {
-    if (isDemoMode) { setDemoBlockOpen(true); return; }
-    if (!workspaceOwnerId) {
-      toast({ title: "Workspace not ready", variant: "destructive" });
-      return;
-    }
-    setIsSaving(true);
+  const saveDraft = async () => {
+    if (!workspaceOwnerId || !name.trim() || busy) return;
+    setBusy("draft");
     try {
       await saveCampaign("draft");
-      toast({ title: "Campaign saved as draft" });
+      void queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      toast.success("Draft saved");
       navigate("/dashboard/campaigns");
-    } catch (e: any) {
-      toast({ title: "Failed to save", description: e.message, variant: "destructive" });
+    } catch (err) {
+      console.error("Draft save failed:", err);
+      toast.error("The draft did not save. Try again.");
     } finally {
-      setIsSaving(false);
+      setBusy(null);
     }
   };
 
-  const handleSend = async () => {
-    if (isDemoMode) { setDemoBlockOpen(true); return; }
-    if (!workspaceOwnerId) {
-      toast({ title: "Workspace not ready", variant: "destructive" });
-      return;
-    }
-    if (!allValid || overHardLimit) {
-      toast({ title: "Complete every step and trim message under 320 chars.", variant: "destructive" });
-      return;
-    }
-    setIsSending(true);
+  const send = async () => {
+    if (!workspaceOwnerId || firstProblemStep !== -1 || busy) return;
+    setBusy("send");
     try {
-      const isScheduled = timing === "scheduled" && !!scheduledDate;
-      const campaignStatus: "scheduled" | "active" = isScheduled ? "scheduled" : "active";
-      const campaign = await saveCampaign(campaignStatus);
-      if (!campaign) throw new Error("Failed to create campaign");
+      // The campaign is saved as a draft, then the server checks every rule and queues the texts.
+      const campaign = await saveCampaign("draft");
+      const { data, error } = await supabase.functions.invoke("start-campaign", {
+        body: { campaign_id: campaign.id, scheduled_at: timing === "scheduled" ? new Date(scheduledAt).toISOString() : null },
+      });
+      const result = (data ?? null) as StartResult | null;
+      const failure = error ? ((await readFunctionError(error)) ?? { error: "unreachable" }) : result?.error ? result : null;
 
-      const jobs = validRecipients.map((r) => ({
-        campaign_id: campaign.id,
-        user_id: workspaceOwnerId,
-        phone: r.phone,
-        first_name: r.first_name || null,
-        message: message
-          .replace(/\{first_name\}/g, r.first_name || "there")
-          .replace(/\{form_link\}/g, formLink),
-      }));
-
-      if (jobs.length > 0) {
-        const { error: jobsError } = await (supabase as any).from("campaign_jobs").insert(jobs);
-        if (jobsError) throw jobsError;
+      void queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      if (failure) {
+        toast.error(startErrorMessage(failure), { description: "Nothing was sent. The campaign is saved as a draft.", duration: 9000 });
+        if (!draft) navigate(`/dashboard/campaigns/new?draft=${campaign.id}`, { replace: true });
+        return;
       }
 
-      toast({
-        title: isScheduled ? "Campaign scheduled" : "Campaign queued — sending shortly",
-        description: isScheduled
-          ? `Will send to ${jobs.length} recipients on ${new Date(scheduledDate).toLocaleString()}.`
-          : `Queued ${jobs.length} messages. Delivery completes within a minute.`,
-      });
+      toast.success(
+        result?.status === "scheduled"
+          ? `Scheduled for ${new Date(scheduledAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`
+          : `${pluralize(result?.queued ?? recipients.valid.length, "text")} queued. Sending starts within a minute.`,
+      );
       navigate("/dashboard/campaigns");
-    } catch (e: any) {
-      toast({ title: "Failed to queue campaign", description: e.message, variant: "destructive" });
+    } catch (err) {
+      console.error("Campaign send failed:", err);
+      toast.error("The campaign did not start, and no texts were sent. Try again.");
     } finally {
-      setIsSending(false);
+      setBusy(null);
     }
   };
 
+  if (draftId && draftLoading) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-10" role="status" aria-label="Loading draft">
+        <Skeleton className="h-96 rounded-2xl" />
+      </div>
+    );
+  }
+
+  const stepProblem = problems[step];
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b border-border bg-card sticky top-0 z-50">
-        <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            <Button variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground hover:text-foreground" onClick={() => navigate("/dashboard/campaigns")}>
-              <ArrowLeft className="w-4 h-4 mr-1" /> Campaigns
+    <div>
+      <div className="sticky top-14 z-30 border-b border-border bg-card/95 backdrop-blur md:top-0">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2">
+            <Button asChild variant="ghost" size="sm" className="shrink-0 text-muted-foreground">
+              <Link to="/dashboard/campaigns">
+                <ArrowLeft className="mr-1 h-4 w-4" />
+                Campaigns
+              </Link>
             </Button>
-            <span className="text-border" aria-hidden>/</span>
-            <h1 className="text-[15px] font-semibold text-foreground truncate">New SMS Campaign</h1>
+            <h1 className="truncate text-sm font-semibold text-foreground">{name.trim() || "New text campaign"}</h1>
           </div>
-          <Button variant="outline" size="sm" className="h-8" onClick={handleSaveDraft} disabled={isSaving || !campaignName.trim()}>
-            {isSaving && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
-            Save Draft
+          <Button variant="outline" size="sm" onClick={saveDraft} disabled={!name.trim() || busy !== null}>
+            {busy === "draft" && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+            Save draft
           </Button>
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-6">
-        {/* Progress */}
-        <div className="flex items-center justify-between mb-8">
-          {steps.map((step, index) => (
-            <div key={step.id} className="flex items-center">
-              <button
-                onClick={() => {
-                  if (canJumpTo(step.id)) setCurrentStep(step.id);
-                  else toast({ title: "Complete the current step first." });
-                }}
-                disabled={!canJumpTo(step.id)}
-                className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors ${
-                  currentStep >= step.id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
-                } ${!canJumpTo(step.id) ? "opacity-50 cursor-not-allowed" : ""}`}
-              >
-                <step.icon className="w-5 h-5" />
-              </button>
-              <span className={`ml-2 text-sm font-medium hidden sm:block ${
-                currentStep >= step.id ? "text-foreground" : "text-muted-foreground"
-              }`}>
-                {step.title}
-              </span>
-              {index < steps.length - 1 && (
-                <div className={`w-12 lg:w-24 h-0.5 mx-2 ${
-                  currentStep > step.id ? "bg-primary" : "bg-muted"
-                }`} />
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Sending overlay */}
-        {isSending && (
-          <div className="fixed inset-0 z-50 bg-background/80 flex items-center justify-center">
-            <Card className="w-full max-w-sm">
-              <CardContent className="p-8 text-center space-y-4">
-                <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
-                <h3 className="text-lg font-semibold text-foreground">Queueing campaign…</h3>
-                <p className="text-sm text-muted-foreground">This only takes a moment.</p>
-              </CardContent>
-            </Card>
+      <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+        {!planLoading && allowance === 0 && (
+          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-gold/40 bg-gold-light/60 p-4">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-gold-deep" />
+            <p className="text-sm text-foreground">
+              Text campaigns are part of the Starter plan and up. You can build and save this campaign now, and send it after you upgrade.{" "}
+              <Link to="/dashboard/settings/billing" className="font-medium underline underline-offset-4">
+                See plans
+              </Link>
+            </p>
           </div>
         )}
-
-        <Card className="bg-card border border-border rounded-2xl">
-          <CardContent className="p-8">
-            {/* Step 1: Setup */}
-            {currentStep === 1 && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Campaign Setup</h2>
-                  <p className="text-muted-foreground">Name your campaign and select a form</p>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <Label>Campaign Name</Label>
-                    <Input
-                      value={campaignName}
-                      onChange={(e) => setCampaignName(e.target.value)}
-                      placeholder="e.g. Q1 Customer Check-in"
-                      className="mt-1"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Linked Form</Label>
-                    <p className="text-sm text-muted-foreground mb-2">Which form should recipients complete?</p>
-                    <div className="space-y-2">
-                      {formsLoading && [1,2].map(i => <Skeleton key={i} className="h-16 w-full" />)}
-                      {!formsLoading && (forms ?? []).map((form) => (
-                        <Card
-                          key={form.id}
-                          onClick={() => setSelectedFormId(form.id)}
-                          className={`cursor-pointer transition-all ${
-                            selectedFormId === form.id
-                              ? "border-primary ring-2 ring-primary/20"
-                              : "border-border hover:border-border"
-                          }`}
-                        >
-                          <CardContent className="p-4 flex items-center justify-between">
-                            <div>
-                              <div className="font-medium text-foreground">{form.name}</div>
-                              <div className="text-sm text-muted-foreground">{form.submission_count ?? 0} responses</div>
-                            </div>
-                            {selectedFormId === form.id && (
-                              <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                                <Check className="w-4 h-4 text-primary-foreground" />
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
-                      {!formsLoading && (forms ?? []).length === 0 && (
-                        <p className="text-sm text-muted-foreground py-4 text-center">
-                          No forms yet.{" "}
-                          <button className="text-primary underline" onClick={() => navigate("/dashboard/forms/new/edit")}>
-                            Create one first
-                          </button>
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label>Campaign Type</Label>
-                    <div className="flex gap-3 mt-1">
-                      <Badge className="bg-primary text-primary-foreground">SMS</Badge>
-                      <Badge variant="outline" className="text-muted-foreground opacity-60">Email <span className="text-xs ml-1">SMS only for now</span></Badge>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Step 2: Message */}
-            {currentStep === 2 && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Craft your message</h2>
-                  <p className="text-muted-foreground">Write your SMS with a {SMS_CHAR_LIMIT} character limit</p>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <Label>Message</Label>
-                    <span className={`text-sm tabular-nums ${overHardLimit ? "text-destructive font-medium" : estimatedLength > SMS_CHAR_LIMIT ? "text-warning font-medium" : "text-muted-foreground"}`}>
-                      {estimatedLength}/{SMS_HARD_LIMIT}{selectedForm ? "" : " (pick a form for accurate count)"}
-                    </span>
-                  </div>
-                  <Textarea
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    rows={4}
-                    maxLength={500}
-                    className="resize-none"
-                  />
-                  {overHardLimit && (
-                    <p className="text-xs text-destructive mt-2">Expands past {SMS_HARD_LIMIT} chars with the link. Shorten before sending.</p>
+        <ol className="mb-8 flex items-center gap-2" aria-label="Steps">
+          {STEPS.map((label, index) => {
+            const done = index < step && problems[index] === null;
+            const current = index === step;
+            return (
+              <li key={label} className="flex flex-1 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => canOpen(index) && setStep(index)}
+                  disabled={!canOpen(index)}
+                  aria-current={current ? "step" : undefined}
+                  className={cn(
+                    "flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                    current ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
                   )}
-                  <div className="flex gap-2 mt-2">
-                    <Button variant="outline" size="sm" onClick={() => insertVariable("{first_name}")}>
-                      + {"{first_name}"}
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => insertVariable("{form_link}")}>
-                      + {"{form_link}"}
-                    </Button>
-                  </div>
-                </div>
+                >
+                  <span
+                    className={cn(
+                      "flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums",
+                      current ? "bg-background text-foreground" : done ? "bg-success-light text-success" : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {done ? <Check className="h-3.5 w-3.5" /> : index + 1}
+                  </span>
+                  <span className={cn(!current && "hidden sm:inline")}>{label}</span>
+                </button>
+                {index < STEPS.length - 1 && <span className="h-px flex-1 bg-border" aria-hidden="true" />}
+              </li>
+            );
+          })}
+        </ol>
 
-                {/* Phone preview */}
-                <div className="flex justify-center">
-                  <div className="w-64 rounded-3xl p-4 border-4 border-border bg-muted/30">
-                    <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
-                      <Smartphone className="w-3 h-3" />
-                      SMS Preview
+        <div className="rounded-2xl border border-border bg-card p-5 sm:p-8">
+          {step === 0 && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="display text-3xl text-foreground">Which form are you sending?</h2>
+                <p className="mt-1.5 text-sm text-muted-foreground">Each client gets a text with a link to this form.</p>
+              </div>
+              <div>
+                <Label htmlFor="campaign-name">Campaign name</Label>
+                <Input
+                  id="campaign-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Spring clients"
+                  maxLength={80}
+                  className="mt-1.5"
+                />
+                <p className="mt-1.5 text-xs text-muted-foreground">Only you see this name.</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Form</p>
+                <div className="mt-2 space-y-2" role="radiogroup" aria-label="Form">
+                  {formsLoading && <Skeleton className="h-16 w-full rounded-xl" />}
+                  {!formsLoading &&
+                    publishedForms.map((form) => {
+                      const isSelected = form.id === formId;
+                      return (
+                        <button
+                          key={form.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={isSelected}
+                          onClick={() => setFormId(form.id)}
+                          className={cn(
+                            "flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors",
+                            isSelected ? "border-foreground bg-muted/40" : "border-border hover:border-border-hover",
+                          )}
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-medium text-foreground">{form.name}</span>
+                            <span className="block truncate text-xs text-muted-foreground">
+                              {PUBLIC_APP_URL.replace(/^https?:\/\//, "")}/collect/{form.slug}
+                            </span>
+                          </span>
+                          {isSelected && (
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-foreground">
+                              <Check className="h-3 w-3 text-background" />
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  {!formsLoading && publishedForms.length === 0 && (
+                    <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center">
+                      <p className="text-sm text-muted-foreground">You need a published form before you can send a campaign.</p>
+                      <Button asChild variant="outline" size="sm" className="mt-3">
+                        <Link to="/dashboard/forms/new">Create a form</Link>
+                      </Button>
                     </div>
-                    <div className="bg-card rounded-2xl p-4 shadow-sm border">
-                      <p className="text-sm text-foreground whitespace-pre-wrap break-words">{previewMessage}</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Step 3: Recipients */}
-            {currentStep === 3 && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Add recipients</h2>
-                  <p className="text-muted-foreground">One per line. Optionally add a first name after a comma.</p>
+          {step === 1 && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="display text-3xl text-foreground">Write the text</h2>
+                <p className="mt-1.5 text-sm text-muted-foreground">Keep it short and personal. Say who you are.</p>
+              </div>
+              <div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <Label htmlFor="campaign-message">Message</Label>
+                  <span className={cn("text-xs tabular-nums", tooLong ? "font-medium text-destructive" : "text-muted-foreground")}>
+                    {size.characters} characters, {pluralize(size.segments, "text")} per person
+                  </span>
                 </div>
-
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 mb-4">
-                  <div className="flex items-start gap-3">
-                    <span className="text-xl">⚠️</span>
-                    <div className="text-xs text-foreground">
-                      <p className="font-semibold mb-1">SMS compliance — you are responsible</p>
-                      <p className="text-muted-foreground">
-                        Only send to recipients who have given you explicit prior consent to receive SMS from your business. Include "Reply STOP to unsubscribe" in your message template when sending to US numbers. You're also responsible for 10DLC registration with carriers — Happy Client does not handle this for you.
-                      </p>
-                    </div>
-                  </div>
+                <Textarea
+                  id="campaign-message"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={5}
+                  maxLength={600}
+                  className="mt-1.5 resize-none"
+                />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setMessage((m) => `${m}{first_name}`)}>
+                    Add first name
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setMessage((m) => `${m} {form_link}`)}>
+                    Add form link
+                  </Button>
                 </div>
-
-                <div>
-                  <Label>Recipients</Label>
-                  <Textarea
-                    value={recipientsText}
-                    onChange={(e) => setRecipientsText(e.target.value)}
-                    rows={8}
-                    placeholder={"+1234567890, Jane\n+1987654321, Bob\n+1555000111"}
-                    className="mt-1 font-mono text-sm resize-none"
-                  />
-                  <div className="flex items-center justify-between mt-2 text-sm">
-                    <span className="text-muted-foreground">E.164 format (e.g. +14155551234)</span>
-                    <Badge variant={validRecipients.length > 0 ? "default" : "secondary"}>
-                      {validRecipients.length} valid recipient{validRecipients.length !== 1 ? "s" : ""}
-                    </Badge>
-                  </div>
+                {size.unicode && !tooLong && (
+                  <p className="mt-2 text-xs text-muted-foreground">An emoji or special character in the message makes each text hold fewer characters.</p>
+                )}
+              </div>
+              <div>
+                <p className="eyebrow mb-2">What Sarah will see</p>
+                <div className="rounded-2xl bg-muted/50 p-4">
+                  <p className="ml-auto w-fit max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-foreground px-4 py-2.5 text-sm text-background">
+                    {preview}
+                  </p>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Step 4: Schedule */}
-            {currentStep === 4 && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">When should we send?</h2>
-                  <p className="text-muted-foreground">Choose when to deliver your campaign</p>
+          {step === 2 && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="display text-3xl text-foreground">Who gets it?</h2>
+                <p className="mt-1.5 text-sm text-muted-foreground">Paste one person on each line: a mobile number, then a comma and a first name.</p>
+              </div>
+              <div>
+                <Label htmlFor="campaign-recipients">Phone numbers</Label>
+                <Textarea
+                  id="campaign-recipients"
+                  value={recipientsText}
+                  onChange={(e) => setRecipientsText(e.target.value)}
+                  rows={9}
+                  placeholder={"(904) 555-0142, Jane\n904-555-0177, Marcus\n+44 7700 900123, Priya"}
+                  className="mt-1.5 resize-none font-mono text-sm"
+                />
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                  <span className={cn("font-medium", recipients.valid.length > 0 ? "text-success" : "text-muted-foreground")}>
+                    {pluralize(recipients.valid.length, "number")} ready
+                  </span>
+                  {recipients.duplicates > 0 && <span className="text-muted-foreground">{pluralize(recipients.duplicates, "repeat")} removed</span>}
                 </div>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  US and Canada numbers work as you write them. For another country, start with + and the country code.
+                </p>
+                {outsideNorthAmerica > 0 && (
+                  <p className="mt-1.5 text-xs text-warning">
+                    {pluralize(outsideNorthAmerica, "number is", "numbers are")} outside the US and Canada. Those send only when that country is turned on
+                    for this app.
+                  </p>
+                )}
+                {recipients.invalid.length > 0 && (
+                  <div className="mt-3 rounded-xl border border-warning/40 bg-warning-light px-4 py-3 text-sm" role="alert">
+                    <p className="flex items-center gap-2 font-medium text-foreground">
+                      <AlertTriangle className="h-4 w-4 text-warning" />
+                      {pluralize(recipients.invalid.length, "line")} skipped. No phone number found.
+                    </p>
+                    <ul className="mt-1.5 space-y-0.5 font-mono text-xs text-muted-foreground">
+                      {recipients.invalid.slice(0, 5).map((line, index) => (
+                        <li key={index} className="truncate">
+                          {line}
+                        </li>
+                      ))}
+                      {recipients.invalid.length > 5 && <li>and {recipients.invalid.length - 5} more</li>}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
-                <RadioGroup value={timing} onValueChange={(v) => setTiming(v as "now" | "scheduled")}>
-                  <div className="space-y-3">
-                    <Card className={`cursor-pointer ${timing === "now" ? "border-primary" : "border-border"}`}>
-                      <CardContent className="p-4 flex items-center gap-4">
-                        <RadioGroupItem value="now" id="now" />
-                        <Label htmlFor="now" className="flex-1 cursor-pointer">
-                          <div className="font-medium">Send now</div>
-                          <div className="text-sm text-muted-foreground">Queues immediately; typically delivered within a minute.</div>
-                        </Label>
-                      </CardContent>
-                    </Card>
-                    <Card className={`cursor-pointer ${timing === "scheduled" ? "border-primary" : "border-border"}`}>
-                      <CardContent className="p-4 flex items-center gap-4">
-                        <RadioGroupItem value="scheduled" id="scheduled" />
-                        <Label htmlFor="scheduled" className="flex-1 cursor-pointer">
-                          <div className="font-medium">Schedule for later</div>
-                          <div className="text-sm text-muted-foreground">Pick a specific date and time.</div>
-                        </Label>
-                        {timing === "scheduled" && (
+          {step === 3 && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="display text-3xl text-foreground">Check it and send</h2>
+                <p className="mt-1.5 text-sm text-muted-foreground">Texts cannot be taken back after they go out.</p>
+              </div>
+
+              <dl className="divide-y divide-border rounded-xl border border-border">
+                {[
+                  { label: "Form", value: selectedForm?.name ?? "None" },
+                  { label: "People", value: pluralize(recipients.valid.length, "person", "people") },
+                  { label: "Texts to send", value: (recipients.valid.length * size.segments).toLocaleString() },
+                ].map((row) => (
+                  <div key={row.label} className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
+                    <dt className="text-muted-foreground">{row.label}</dt>
+                    <dd className="font-medium tabular-nums text-foreground">{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+
+              <fieldset>
+                <legend className="text-sm font-medium text-foreground">When</legend>
+                <div className="mt-2 space-y-2">
+                  {(
+                    [
+                      { value: "now", title: "Send now", note: "Texts start to go out within a minute." },
+                      { value: "scheduled", title: "Send later", note: "Pick a day and a time." },
+                    ] as const
+                  ).map((option) => (
+                    <label
+                      key={option.value}
+                      className={cn(
+                        "flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition-colors",
+                        timing === option.value ? "border-foreground bg-muted/40" : "border-border hover:border-border-hover",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="timing"
+                        value={option.value}
+                        checked={timing === option.value}
+                        onChange={() => setTiming(option.value)}
+                        className="mt-1 h-4 w-4 accent-[hsl(var(--foreground))]"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium text-foreground">{option.title}</span>
+                        <span className="block text-sm text-muted-foreground">{option.note}</span>
+                        {option.value === "scheduled" && timing === "scheduled" && (
                           <Input
                             type="datetime-local"
-                            value={scheduledDate}
-                            onChange={(e) => setScheduledDate(e.target.value)}
-                            className="w-auto"
+                            value={scheduledAt}
+                            onChange={(e) => setScheduledAt(e.target.value)}
+                            aria-label="Date and time to send"
+                            className="mt-2 w-full sm:w-auto"
                           />
                         )}
-                      </CardContent>
-                    </Card>
-                  </div>
-                </RadioGroup>
-
-                {/* Review summary */}
-                <div className="mt-6 space-y-3">
-                  <h3 className="font-semibold text-foreground">Review</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between p-3 bg-muted/50 rounded-xl text-sm">
-                      <span className="text-muted-foreground">Campaign</span>
-                      <span className="font-medium text-foreground">{campaignName}</span>
-                    </div>
-                    <div className="flex justify-between p-3 bg-muted/50 rounded-xl text-sm">
-                      <span className="text-muted-foreground">Form</span>
-                      <span className="font-medium text-foreground">{selectedForm?.name ?? "—"}</span>
-                    </div>
-                    <div className="flex justify-between p-3 bg-muted/50 rounded-xl text-sm">
-                      <span className="text-muted-foreground">Recipients</span>
-                      <span className="font-medium text-foreground">{validRecipients.length} contacts</span>
-                    </div>
-                    <div className="flex justify-between p-3 bg-warning/10 rounded-xl text-sm">
-                      <span className="font-medium text-foreground">SMS Credits</span>
-                      <span className="font-bold text-foreground">{validRecipients.length} credits</span>
-                    </div>
-                  </div>
+                      </span>
+                    </label>
+                  ))}
                 </div>
-              </div>
-            )}
+              </fieldset>
 
-            {/* Navigation */}
-            <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-              <Button
-                variant="ghost"
-                onClick={() => setCurrentStep((s) => s - 1)}
-                disabled={currentStep === 1}
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" /> Back
-              </Button>
-
-              {currentStep < 4 ? (
-                <Button onClick={() => setCurrentStep((s) => s + 1)} disabled={!canProceed()}>
-                  Next <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              ) : (
-                <Button onClick={handleSend} disabled={!allValid || isSending || overHardLimit}>
-                  {isSending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4 mr-2" />
-                  )}
-                  {timing === "now" ? "Send Campaign" : "Schedule Campaign"}
-                </Button>
-              )}
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-gold/40 bg-gold-light/60 px-4 py-3.5">
+                <input
+                  type="checkbox"
+                  checked={confirmedConsent}
+                  onChange={(e) => setConfirmedConsent(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--foreground))]"
+                />
+                <span className="text-sm text-foreground">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <ShieldCheck className="h-4 w-4 text-gold-deep" />
+                    Every person on this list agreed to get texts from my business.
+                  </span>
+                  <span className="mt-1 block text-muted-foreground">
+                    The law in the US and many other countries requires this. You are responsible for consent and for carrier registration of your sending number.
+                  </span>
+                </span>
+              </label>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          )}
 
-      <Dialog open={demoBlockOpen} onOpenChange={setDemoBlockOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Demo mode is on</DialogTitle>
-            <DialogDescription>
-              You're previewing with mock data. Switch off Demo Mode to send a real campaign — we won't write anything while demo is on.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDemoBlockOpen(false)}>Got it</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          {stepProblem && (
+            <p className="mt-5 text-sm text-muted-foreground" role="status">
+              {stepProblem}
+            </p>
+          )}
+
+          <div className="mt-8 flex items-center justify-between border-t border-border pt-6">
+            <Button variant="ghost" onClick={() => setStep((current) => current - 1)} disabled={step === 0 || busy !== null}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+            {step < STEPS.length - 1 ? (
+              <Button onClick={() => setStep((current) => current + 1)} disabled={problems[step] !== null}>
+                Next
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : (
+              <Button onClick={send} disabled={firstProblemStep !== -1 || busy !== null}>
+                {busy === "send" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                {busy === "send" ? "Queueing texts" : timing === "now" ? `Send to ${pluralize(recipients.valid.length, "person", "people")}` : "Schedule campaign"}
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

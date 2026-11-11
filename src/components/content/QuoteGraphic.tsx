@@ -1,188 +1,165 @@
 import { forwardRef, useRef, useState } from "react";
 import { toPng } from "html-to-image";
-import { Star, Download } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ScaledPreview } from "@/components/shared/ScaledPreview";
+import type { QuoteContent } from "@/lib/content";
+import { slugify } from "@/lib/slug";
+import { cn } from "@/lib/utils";
 
-export type QuoteStyle = "sunset" | "minimal" | "bold";
+type QuoteStyle = "ivory" | "ink" | "gold";
 
-export interface QuoteGraphicData {
-  quote: string;
-  author: string;
-  company?: string;
-  rating?: number;
-}
+const SIZE = 1080;
 
-interface QuoteGraphicProps {
-  data: QuoteGraphicData;
-  accentColor?: string;
-}
-
-const STYLES: Record<QuoteStyle, { bg: string; text: string; subtext: string; brand: string }> = {
-  sunset: {
-    bg: "linear-gradient(135deg, #F97316 0%, #DB2777 100%)",
-    text: "#FFFFFF",
-    subtext: "rgba(255,255,255,0.85)",
-    brand: "rgba(255,255,255,0.7)",
-  },
-  minimal: {
-    bg: "#FFFFFF",
-    text: "#0B0B0F",
-    subtext: "#6B7280",
-    brand: "#9CA3AF",
-  },
-  bold: {
-    bg: "#0B1B3A",
-    text: "#FFFFFF",
-    subtext: "rgba(255,255,255,0.8)",
-    brand: "rgba(255,255,255,0.7)",
+const STYLES: Record<QuoteStyle, { label: string; background: string; text: string; muted: string; accent: string }> = {
+  ivory: { label: "Ivory", background: "#F8F6F1", text: "#1A1714", muted: "#6B645B", accent: "#C08E2A" },
+  ink: { label: "Ink", background: "#1A1714", text: "#F8F6F1", muted: "#B8B0A4", accent: "#D4A94A" },
+  gold: {
+    label: "Gold",
+    background: "linear-gradient(140deg, #6F4A10 0%, #A0741F 100%)",
+    text: "#FDFBF6",
+    muted: "rgba(253, 251, 246, 0.82)",
+    accent: "#F3E0AE",
   },
 };
 
-interface CardProps extends QuoteGraphicProps {
-  style: QuoteStyle;
-  accentColor: string;
-  size: number;
+/** Long quotes get smaller type, so every quote fills the square without spilling. */
+function quoteFontSize(length: number): number {
+  if (length <= 70) return 88;
+  if (length <= 120) return 72;
+  if (length <= 180) return 60;
+  if (length <= 260) return 50;
+  return 42;
 }
 
-const QuoteCard = forwardRef<HTMLDivElement, CardProps>(({ data, style, accentColor, size }, ref) => {
+const STAR_PATH = "M12 2.5l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 17.6l-5.9 3.1 1.2-6.6L2.5 9.5l6.6-.9L12 2.5z";
+
+interface QuoteArtProps {
+  data: QuoteContent;
+  style: QuoteStyle;
+}
+
+/** The square graphic at full size. Inline styles only, so the exported image matches the preview. */
+const QuoteArt = forwardRef<HTMLDivElement, QuoteArtProps>(({ data, style }, ref) => {
   const s = STYLES[style];
-  const isMinimal = style === "minimal";
-  const accent = style === "bold" ? accentColor : isMinimal ? accentColor : "#FFD166";
   return (
     <div
       ref={ref}
       style={{
-        width: size,
-        height: size,
-        background: s.bg,
-        color: s.text,
-        padding: size * 0.09,
+        width: SIZE,
+        height: SIZE,
+        boxSizing: "border-box",
+        padding: 104,
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
-        fontFamily: "Inter, system-ui, -apple-system, sans-serif",
-        position: "relative",
-        border: isMinimal ? `1px solid #E5E7EB` : "none",
-        boxSizing: "border-box",
+        background: s.background,
+        color: s.text,
+        fontFamily: '"Inter Variable", Inter, system-ui, sans-serif',
       }}
     >
-      <div style={{ display: "flex", gap: size * 0.012 }}>
-        {Array.from({ length: data.rating ?? 5 }).map((_, i) => (
-          <Star key={i} size={size * 0.045} fill={accent} stroke={accent} />
-        ))}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", height: 72 }}>
+        <div
+          aria-hidden="true"
+          style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontSize: 190, lineHeight: 0.82, height: 72, color: s.accent }}
+        >
+          &ldquo;
+        </div>
+        {data.rating ? (
+          <div style={{ display: "flex", gap: 8 }}>
+            {Array.from({ length: data.rating }, (_, i) => (
+              <svg key={i} width="36" height="36" viewBox="0 0 24 24" aria-hidden="true">
+                <path d={STAR_PATH} fill={s.accent} />
+              </svg>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <div
         style={{
-          fontSize: size * 0.065,
-          fontWeight: 600,
-          lineHeight: 1.2,
-          letterSpacing: "-0.02em",
-          textAlign: "left",
+          fontFamily: '"Instrument Serif", Georgia, serif',
+          fontSize: quoteFontSize(data.quote.length),
+          lineHeight: 1.16,
+          letterSpacing: "-0.01em",
+          fontWeight: 400,
         }}
       >
-        &ldquo;{data.quote}&rdquo;
+        {data.quote}
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-        <div>
-          <div style={{ fontSize: size * 0.028, fontWeight: 600, marginBottom: size * 0.006 }}>
-            {data.author}
+      <div>
+        <div style={{ width: 72, height: 3, background: s.accent, marginBottom: 32 }} />
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 40 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 34, fontWeight: 600, lineHeight: 1.25 }}>{data.author || "A happy client"}</div>
+            {data.company && <div style={{ fontSize: 26, lineHeight: 1.35, color: s.muted, marginTop: 6 }}>{data.company}</div>}
           </div>
-          {data.company && (
-            <div style={{ fontSize: size * 0.022, color: s.subtext, fontWeight: 400 }}>
-              {data.company}
-            </div>
-          )}
-        </div>
-        <div
-          style={{
-            fontSize: size * 0.02,
-            color: s.brand,
-            fontWeight: 500,
-            letterSpacing: "0.05em",
-            textTransform: "uppercase",
-          }}
-        >
-          Happy Client
+          <div style={{ fontSize: 18, letterSpacing: "0.16em", textTransform: "uppercase", color: s.muted, whiteSpace: "nowrap" }}>
+            Happy Client
+          </div>
         </div>
       </div>
     </div>
   );
 });
-QuoteCard.displayName = "QuoteCard";
+QuoteArt.displayName = "QuoteArt";
 
-const QuoteGraphic = ({ data, accentColor = "#F97316" }: QuoteGraphicProps) => {
-  const [style, setStyle] = useState<QuoteStyle>("sunset");
+/** A square quote image in three styles, with a PNG download. */
+export function QuoteGraphic({ data }: { data: QuoteContent }) {
+  const [style, setStyle] = useState<QuoteStyle>("ivory");
   const [downloading, setDownloading] = useState(false);
-  const exportRef = useRef<HTMLDivElement>(null);
+  const artRef = useRef<HTMLDivElement>(null);
 
-  const handleDownload = async () => {
-    if (!exportRef.current) return;
+  const download = async () => {
+    if (!artRef.current) return;
     setDownloading(true);
     try {
-      const dataUrl = await toPng(exportRef.current, {
-        width: 1080,
-        height: 1080,
-        pixelRatio: 1,
-        cacheBust: true,
-      });
+      const dataUrl = await toPng(artRef.current, { width: SIZE, height: SIZE, pixelRatio: 1, cacheBust: true });
       const link = document.createElement("a");
-      link.download = `quote-${Date.now()}.png`;
+      link.download = `quote-${slugify(data.author) || "testimonial"}.png`;
       link.href = dataUrl;
       link.click();
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error("Quote image export failed:", error);
+      toast.error("The image did not download. Try again, or take a screenshot of the preview.");
     } finally {
       setDownloading(false);
     }
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex gap-1.5">
-        {(["sunset", "minimal", "bold"] as QuoteStyle[]).map((opt) => (
+    <div className="space-y-4">
+      <div role="radiogroup" aria-label="Image style" className="flex gap-2">
+        {(Object.keys(STYLES) as QuoteStyle[]).map((key) => (
           <button
-            key={opt}
-            onClick={() => setStyle(opt)}
-            className={`px-2.5 py-1 text-xs font-medium rounded-md capitalize transition-colors ${
-              style === opt
-                ? "bg-primary-light text-primary"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-            }`}
+            key={key}
+            type="button"
+            role="radio"
+            aria-checked={style === key}
+            onClick={() => setStyle(key)}
+            className={cn(
+              "flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
+              style === key ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:border-border-hover hover:text-foreground",
+            )}
           >
-            {opt}
+            <span className="h-3 w-3 rounded-full border border-black/10" style={{ background: STYLES[key].background }} aria-hidden="true" />
+            {STYLES[key].label}
           </button>
         ))}
       </div>
 
-      {/* Visible preview, scaled down */}
-      <div className="overflow-hidden rounded-lg border border-border bg-muted/30 flex items-center justify-center p-3">
-        <div
-          style={{
-            width: 1080,
-            height: 1080,
-            transform: "scale(0.32)",
-            transformOrigin: "top left",
-            marginBottom: -1080 * (1 - 0.32),
-            marginRight: -1080 * (1 - 0.32),
-          }}
-        >
-          <QuoteCard data={data} style={style} accentColor={accentColor} size={1080} />
-        </div>
+      <div className="overflow-hidden rounded-xl border border-border shadow-subtle">
+        <ScaledPreview designWidth={SIZE}>
+          <QuoteArt ref={artRef} data={data} style={style} />
+        </ScaledPreview>
       </div>
 
-      {/* Offscreen full-resolution export node */}
-      <div style={{ position: "fixed", left: -99999, top: 0, pointerEvents: "none" }} aria-hidden>
-        <QuoteCard ref={exportRef} data={data} style={style} accentColor={accentColor} size={1080} />
-      </div>
-
-      <Button onClick={handleDownload} disabled={downloading} className="w-full h-9">
-        <Download className="w-3.5 h-3.5 mr-1.5" />
-        {downloading ? "Preparing PNG…" : "Download PNG (1080×1080)"}
+      <Button onClick={download} disabled={downloading} className="w-full sm:w-auto">
+        {downloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+        {downloading ? "Preparing image" : "Download image (1080 x 1080)"}
       </Button>
     </div>
   );
-};
-
-export default QuoteGraphic;
+}

@@ -1,80 +1,47 @@
-import { useState } from "react";
-import { Link, useLocation, Outlet } from "react-router-dom";
-import { 
-  Settings, 
-  Users, 
-  Plug, 
-  CreditCard, 
-  Key,
-  ArrowLeft,
-  ChevronRight
-} from "lucide-react";
+import type { ReactNode } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { CreditCard, Key, Plug, Settings, Users } from "lucide-react";
+import { PageContainer, PageHeader } from "@/components/shared/PageHeader";
 import { cn } from "@/lib/utils";
 
-const settingsNav = [
-  { path: '/dashboard/settings', label: 'General', icon: Settings },
-  { path: '/dashboard/settings/team', label: 'Team', icon: Users },
-  { path: '/dashboard/settings/integrations', label: 'Integrations', icon: Plug },
-  { path: '/dashboard/settings/billing', label: 'Billing', icon: CreditCard },
-  { path: '/dashboard/settings/api', label: 'API', icon: Key },
+const NAV = [
+  { path: "/dashboard/settings", label: "General", icon: Settings },
+  { path: "/dashboard/settings/team", label: "Team", icon: Users },
+  { path: "/dashboard/settings/billing", label: "Plan and billing", icon: CreditCard },
+  { path: "/dashboard/settings/integrations", label: "Connections", icon: Plug },
+  { path: "/dashboard/settings/api", label: "API keys", icon: Key },
 ];
 
-interface SettingsLayoutProps {
-  children: React.ReactNode;
-}
-
-const SettingsLayout = ({ children }: SettingsLayoutProps) => {
-  const location = useLocation();
-
-  const isActive = (path: string) => {
-    if (path === '/dashboard/settings') {
-      return location.pathname === path;
-    }
-    return location.pathname.startsWith(path);
-  };
+const SettingsLayout = ({ children }: { children: ReactNode }) => {
+  const { pathname } = useLocation();
+  const isActive = (path: string) => (path === "/dashboard/settings" ? pathname === path : pathname.startsWith(path));
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <Link to="/dashboard" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-            ← Dashboard
-          </Link>
-          <span className="text-xs text-muted-foreground/50">/</span>
-          <h1 className="text-[22px] font-semibold text-foreground tracking-tight">Settings</h1>
-        </div>
-        <p className="text-sm text-muted-foreground mb-8 -mt-6 ml-[5.5rem]">Manage your account and preferences</p>
-
-        <div className="flex flex-col md:flex-row gap-8">
-          {/* Sidebar */}
-          <aside className="w-full md:w-56 flex-shrink-0">
-            <nav className="space-y-0.5">
-              {settingsNav.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={cn(
-                    "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors duration-150",
-                    isActive(item.path)
-                      ? "bg-primary-light text-primary font-medium"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                  )}
-                >
-                  <item.icon className="w-4 h-4" />
-                  <span className="flex-1">{item.label}</span>
-                </Link>
-              ))}
-            </nav>
-          </aside>
-
-          {/* Content */}
-          <main className="flex-1 min-w-0">
-            {children}
-          </main>
-        </div>
+    <PageContainer>
+      <PageHeader title="Settings" description="Your account, your team, and your plan." />
+      <div className="flex flex-col gap-8 md:flex-row">
+        <nav aria-label="Settings" className="-mx-1 flex shrink-0 gap-1 overflow-x-auto px-1 pb-1 md:mx-0 md:w-52 md:flex-col md:overflow-visible md:px-0 md:pb-0">
+          {NAV.map((item) => {
+            const active = isActive(item.path);
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex h-10 shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg px-3 text-sm transition-colors",
+                  active ? "bg-primary font-medium text-primary-foreground" : "text-foreground/75 hover:bg-accent hover:text-foreground",
+                )}
+              >
+                <item.icon className="h-4 w-4" strokeWidth={1.75} />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="min-w-0 flex-1">{children}</div>
       </div>
-    </div>
+    </PageContainer>
   );
 };
 

@@ -1,360 +1,428 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { 
-  Search, Sparkles, Star, DollarSign, Video, Check,
-  Copy, RefreshCw, Edit, Save, Download, Twitter,
-  Linkedin, Mail, FileText, Image, Scissors, Bot,
-  Lock, Loader2, Instagram
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  AlertTriangle,
+  Check,
+  FileText,
+  Image as ImageIcon,
+  Library,
+  Linkedin,
+  Loader2,
+  Mail,
+  MessageSquareQuote,
+  PenLine,
+  RefreshCw,
+  Search,
+  ShieldAlert,
+  Twitter,
+  type LucideIcon,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
+import { ContentRenderer, CopyContentButton } from "@/components/content/ContentRenderer";
+import { PageContainer, PageHeader } from "@/components/shared/PageHeader";
+import { PersonAvatar } from "@/components/shared/PersonAvatar";
+import { EmptyState, ErrorState } from "@/components/shared/States";
+import { Stars } from "@/components/shared/Stars";
+import { useApprovedTestimonials } from "@/components/shared/TestimonialPicker";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/use-auth";
 import { useWorkspace } from "@/hooks/use-workspace";
-import { usePlan } from "@/hooks/use-plan";
-import ContentRenderer, { flattenContent } from "@/components/content/ContentRenderer";
+import { CONTENT_FORMATS, type ContentKind, contentErrorMessage, flattenContent } from "@/lib/content";
+import { readFunctionErrorCode } from "@/lib/form-config";
+import { roleLine } from "@/lib/format";
+import { maskName } from "@/lib/testimonial";
+import { cn } from "@/lib/utils";
 
-interface ContentType {
-  id: string;
-  Icon: any;
-  title: string;
-  subtitle: string;
-  category: 'text' | 'visual' | 'video';
-  isPro?: boolean;
-  dbType: string;
+const FORMAT_ICONS: Record<ContentKind, LucideIcon> = {
+  linkedin: Linkedin,
+  twitter: Twitter,
+  email: Mail,
+  casestudy: FileText,
+  quote: ImageIcon,
+};
+
+const MAX_VERSIONS = 3;
+
+interface Version {
+  kind: ContentKind;
+  data: unknown;
+  /** Numbers in the draft that are not in the testimonial. */
+  unverified: string[];
+  saved: boolean;
 }
 
-const contentTypes: ContentType[] = [
-  { id: 'twitter', Icon: Twitter, title: 'Twitter Thread', subtitle: 'Viral thread with hooks', category: 'text', dbType: 'twitter_thread' },
-  { id: 'linkedin', Icon: Linkedin, title: 'LinkedIn Post', subtitle: 'Professional storytelling', category: 'text', dbType: 'linkedin_post' },
-  { id: 'instagram', Icon: Instagram, title: 'Instagram Carousel', subtitle: '5 swipe-worthy slides', category: 'visual', isPro: true, dbType: 'instagram_carousel' },
-  { id: 'email', Icon: Mail, title: 'Email Snippet', subtitle: 'For sales sequences', category: 'text', dbType: 'email_snippet' },
-  { id: 'casestudy', Icon: FileText, title: 'Case Study', subtitle: 'Mini success story', category: 'text', dbType: 'case_study' },
-  { id: 'quote', Icon: Image, title: 'Quote Graphic', subtitle: 'Share-ready images', category: 'visual', dbType: 'quote_graphic' },
-  { id: 'highlight', Icon: Scissors, title: 'Video Highlight', subtitle: 'Best moments clipped', category: 'video', isPro: true, dbType: 'video_highlight' },
-  { id: 'avatar', Icon: Bot, title: 'AI Avatar Video', subtitle: 'Text becomes video', category: 'video', isPro: true, dbType: 'ai_avatar' },
-];
-
-interface GeneratedResult {
-  contentType: string;
-  data: any;
+function StepTitle({ step, children }: { step: number; children: string }) {
+  return (
+    <h2 className="mb-3 flex items-center gap-2.5 text-sm font-semibold text-foreground">
+      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-foreground text-xs font-semibold tabular-nums text-background">
+        {step}
+      </span>
+      {children}
+    </h2>
+  );
 }
 
-const ContentStudio = () => {
-  const { user } = useAuth();
+/**
+ * Turns one approved testimonial into a post, an email section, a case study
+ * or a quote image. The draft is built from the client's own words, and the
+ * owner reads it before it goes anywhere.
+ */
+export default function ContentStudio() {
   const { workspaceOwnerId } = useWorkspace();
-  const { isPro, isLoading: planLoading } = usePlan();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filter, setFilter] = useState<'all' | 'top' | 'video' | 'revenue'>('all');
-  const [selectedTestimonials, setSelectedTestimonials] = useState<string[]>([]);
-  const [selectedContentType, setSelectedContentType] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const { approved, isLoading, error } = useApprovedTestimonials();
+
+  const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(searchParams.get("testimonial"));
+  const [kind, setKind] = useState<ContentKind | null>(null);
+  const [versions, setVersions] = useState<Version[]>([]);
+  const [active, setActive] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [variants, setVariants] = useState<GeneratedResult[]>([]);
-  const [activeVariant, setActiveVariant] = useState(0);
+  const [failure, setFailure] = useState<string | null>(null);
+  const draftRef = useRef<HTMLElement>(null);
 
-  // Fetch real testimonials
-  const { data: testimonials = [], isLoading } = useQuery({
-    queryKey: ['content-studio-testimonials', workspaceOwnerId],
-    queryFn: async () => {
-      if (!workspaceOwnerId) return [];
-      const { data, error } = await supabase
-        .from('testimonials')
-        .select('id, author_name, author_company, content, rating, revenue_attributed, type')
-        .eq('user_id', workspaceOwnerId)
-        .eq('status', 'approved')
-        .order('revenue_attributed', { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!workspaceOwnerId,
-  });
+  const withText = useMemo(() => approved.filter((t) => (t.content ?? "").trim().length > 0), [approved]);
+  const withoutText = approved.length - withText.length;
+  const selected = useMemo(() => withText.find((t) => t.id === selectedId) ?? null, [withText, selectedId]);
 
-  const filteredTestimonials = testimonials.filter(t => {
-    const matchesSearch = t.author_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (t.author_company || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (t.content || '').toLowerCase().includes(searchQuery.toLowerCase());
-    if (filter === 'top') return matchesSearch && t.rating === 5;
-    if (filter === 'video') return matchesSearch && t.type === 'video';
-    if (filter === 'revenue') return matchesSearch && Number(t.revenue_attributed) > 2000;
-    return matchesSearch;
-  });
+  const visible = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return withText;
+    return withText.filter((t) => [t.author_name, t.author_company, t.content].filter(Boolean).join(" ").toLowerCase().includes(query));
+  }, [withText, search]);
 
-  const toggleTestimonial = (id: string) => {
-    setSelectedTestimonials(prev =>
-      prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
-    );
-  };
+  // A new testimonial or format starts a fresh set of drafts.
+  useEffect(() => {
+    setVersions([]);
+    setActive(0);
+    setFailure(null);
+  }, [selectedId, kind]);
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount);
+  const current = versions[active] ?? null;
+  const format = CONTENT_FORMATS.find((f) => f.id === kind) ?? null;
 
-  const generateContent = async () => {
-    if (selectedTestimonials.length === 0 || !selectedContentType || !workspaceOwnerId) return;
+  const generate = async () => {
+    if (!selected || !format || !workspaceOwnerId || isGenerating) return;
     setIsGenerating(true);
+    setFailure(null);
+    // On a phone the draft panel sits below the two steps. Bring it into view.
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      requestAnimationFrame(() => draftRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }
 
     try {
-      const selectedData = testimonials.filter(t => selectedTestimonials.includes(t.id));
-      const contentTypeInfo = contentTypes.find(ct => ct.id === selectedContentType);
-
-      const { data, error } = await supabase.functions.invoke('generate-content', {
+      const { data, error: invokeError } = await supabase.functions.invoke("generate-content", {
         body: {
-          testimonials: selectedData.map(t => ({
-            id: t.id,
-            name: t.author_name,
-            company: t.author_company || '',
-            content: t.content || '',
-            rating: t.rating || 5,
-            revenue: Number(t.revenue_attributed) || 0,
-          })),
-          contentType: selectedContentType,
-          contentTypeInfo: { title: contentTypeInfo?.title, subtitle: contentTypeInfo?.subtitle },
+          testimonial_ids: [selected.id],
+          contentType: format.id,
           workspace_owner_id: workspaceOwnerId,
-        }
+          // Read by the function version that was live before November 2026.
+          testimonials: [
+            {
+              id: selected.id,
+              name: maskName(selected.author_name, selected.display_preference),
+              company: selected.author_company ?? "",
+              content: selected.content ?? "",
+              rating: selected.rating ?? null,
+            },
+          ],
+          contentTypeInfo: { title: format.title, subtitle: format.description },
+        },
       });
+      if (invokeError) throw invokeError;
 
-      if (error) throw error;
-      const result: GeneratedResult = {
-        contentType: data.contentType || selectedContentType,
-        data: data.content,
+      const result = data as { content?: unknown; error?: string; checks?: { unverified_numbers?: string[] } } | null;
+      if (result?.error || !result?.content) {
+        setFailure(contentErrorMessage(result?.error));
+        return;
+      }
+
+      const { error: saveError } = await supabase.from("generated_content").insert({
+        user_id: workspaceOwnerId,
+        testimonial_ids: [selected.id],
+        type: format.dbType,
+        content: flattenContent(format.id, result.content),
+        metadata: { structured: result.content, contentTypeKey: format.id } as never,
+      });
+      if (saveError) console.error("Saving the draft failed:", saveError);
+      else void queryClient.invalidateQueries({ queryKey: ["generated-content"] });
+
+      const version: Version = {
+        kind: format.id,
+        data: result.content,
+        unverified: result.checks?.unverified_numbers ?? [],
+        saved: !saveError,
       };
-      // Keep up to 3 variants
-      setVariants(prev => {
-        const next = [...prev, result].slice(-3);
-        setActiveVariant(next.length - 1);
+      setVersions((previous) => {
+        const next = [...previous, version].slice(-MAX_VERSIONS);
+        setActive(next.length - 1);
         return next;
       });
-
-      // Save to generated_content
-      const readable = flattenContent(selectedContentType, data.content);
-      await supabase.from('generated_content').insert({
-        user_id: workspaceOwnerId,
-        testimonial_ids: selectedTestimonials,
-        type: contentTypeInfo?.dbType as any,
-        content: readable || JSON.stringify(result.data),
-        metadata: { structured: result.data, contentTypeKey: selectedContentType } as any,
-      });
-
-      toast.success('Content generated and saved');
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Failed to generate content');
+    } catch (err) {
+      console.error("Content generation failed:", err);
+      setFailure(contentErrorMessage(await readFunctionErrorCode(err)));
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const current = variants[activeVariant] || null;
-  const copyContent = () => {
-    if (!current) return;
-    navigator.clipboard.writeText(flattenContent(current.contentType, current.data));
-    toast.success('Copied to clipboard!');
-  };
-
-
+  const libraryButton = (
+    <Button asChild variant="outline">
+      <Link to="/dashboard/content/library">
+        <Library className="mr-2 h-4 w-4" />
+        Saved content
+      </Link>
+    </Button>
+  );
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        <div className="flex items-end justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Content Studio</h1>
-            <p className="text-sm text-muted-foreground mt-1">Transform testimonials into ready-to-publish marketing assets.</p>
-          </div>
+    <PageContainer>
+      <PageHeader
+        title="Content"
+        description="Turn one testimonial into a post, an email, a case study or a quote image. AI writes the draft from your client's own words."
+        actions={libraryButton}
+      />
+
+      {error ? (
+        <ErrorState error={error} onRetry={() => window.location.reload()} />
+      ) : isLoading ? (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]" role="status" aria-label="Loading">
+          <Skeleton className="h-96 rounded-2xl" />
+          <Skeleton className="h-96 rounded-2xl" />
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* LEFT - Source */}
-          <div className="space-y-4">
-            <Card className="bg-card border border-border rounded-xl shadow-none">
-              <CardContent className="p-5">
-                <h2 className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground mb-3">Source</h2>
+      ) : withText.length === 0 ? (
+        <EmptyState
+          icon={MessageSquareQuote}
+          title="Approve a written testimonial first"
+          description={
+            approved.length > 0
+              ? "Your approved testimonials are recordings with no written text. Content is written from text, so add or collect a written one."
+              : "Content is written from testimonials you have approved. Approve one, then come back here."
+          }
+          actions={
+            <Button asChild>
+              <Link to="/dashboard/testimonials">Go to testimonials</Link>
+            </Button>
+          }
+        />
+      ) : (
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+          <div className="space-y-6">
+            <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="content-step-1">
+              <div id="content-step-1">
+                <StepTitle step={1}>Pick a testimonial</StepTitle>
+              </div>
+              {withText.length > 5 && (
                 <div className="relative mb-3">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input placeholder="Search testimonials..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-9" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search by name or words"
+                    aria-label="Search approved testimonials"
+                    className="pl-10"
+                  />
                 </div>
-                <div className="flex flex-wrap gap-1 mb-4 border-b border-border -mx-5 px-5 pb-3">
-                  {[{ value: 'all', label: 'All' }, { value: 'top', label: 'Top rated' }, { value: 'video', label: 'Video' }, { value: 'revenue', label: 'High revenue' }].map((f) => (
-                    <button key={f.value} onClick={() => setFilter(f.value as any)}
-                      className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${filter === f.value ? 'bg-primary-light text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'}`}>
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-
-                {selectedTestimonials.length > 0 && (
-                  <div className="text-[10px] uppercase tracking-wider font-medium text-primary mb-3 tabular-nums">{selectedTestimonials.length} selected</div>
-                )}
-
-                {isLoading ? (
-                  <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-20 w-full" />)}</div>
-                ) : testimonials.length === 0 ? (
-                  <div className="text-center py-10 border border-dashed border-border rounded-lg">
-                    <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary-light mb-3">
-                      <FileText className="w-4 h-4 text-primary" />
-                    </div>
-                    <p className="text-sm text-muted-foreground">No approved testimonials yet.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-1.5 max-h-[440px] overflow-y-auto -mx-1 px-1">
-                    {filteredTestimonials.map((t) => {
-                      const isSelected = selectedTestimonials.includes(t.id);
-                      return (
-                        <div key={t.id} onClick={() => toggleTestimonial(t.id)}
-                          className={`p-3 rounded-lg border cursor-pointer transition-colors ${isSelected ? 'border-primary bg-primary-light/60' : 'border-border hover:border-border-hover'}`}>
-                          <div className="flex items-start gap-3">
-                            <div className="relative shrink-0">
-                              <div className="w-9 h-9 rounded-full bg-primary-light text-primary flex items-center justify-center text-sm font-semibold">{t.author_name[0]}</div>
-                              {isSelected && (
-                                <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center ring-2 ring-card">
-                                  <Check className="w-2.5 h-2.5 text-primary-foreground" />
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-0.5">
-                                <span className="font-medium text-sm text-foreground truncate">{t.author_name}</span>
-                                {t.type === 'video' && <Video className="w-3 h-3 text-muted-foreground shrink-0" />}
-                              </div>
-                              <div className="text-xs text-muted-foreground mb-1 truncate">{t.author_company}</div>
-                              <p className="text-xs text-muted-foreground line-clamp-2">{t.content}</p>
-                              <div className="flex items-center gap-3 mt-2">
-                                <div className="flex gap-px">{[...Array(t.rating || 0)].map((_, i) => <Star key={i} className="w-3 h-3 fill-foreground text-foreground" />)}</div>
-                                {Number(t.revenue_attributed) > 0 && (
-                                  <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground tabular-nums">
-                                    {formatCurrency(Number(t.revenue_attributed))}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* CENTER - Content Type */}
-          <div className="space-y-4">
-            <Card className="bg-card border border-border rounded-xl shadow-none">
-              <CardContent className="p-5">
-                <h2 className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground mb-3">Format</h2>
-                <div className="grid grid-cols-2 gap-2">
-                  {contentTypes.map((type) => {
-                    const isSelected = selectedContentType === type.id;
-                    const locked = !!type.isPro && !isPro && !planLoading;
-                    return (
-                      <button key={type.id} onClick={() => !locked && setSelectedContentType(type.id)} disabled={locked}
-                        className={`relative p-3 rounded-lg border text-left transition-colors ${
-                          isSelected ? 'border-primary bg-primary-light' :
-                          locked ? 'border-border bg-muted/30 opacity-60' :
-                          'border-border hover:border-border-hover'
-                        }`}>
-                        <div className={`w-7 h-7 rounded-md flex items-center justify-center mb-2 ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                          <type.Icon className="w-3.5 h-3.5" />
-                        </div>
-                        <div className="font-medium text-sm text-foreground">{type.title}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">{type.subtitle}</div>
-                        {type.isPro && locked && (
-                          <div className="absolute top-2 right-2 inline-flex items-center gap-1 text-[9px] uppercase tracking-wider font-medium text-muted-foreground">
-                            <Lock className="w-2.5 h-2.5" /> Pro
-                          </div>
+              )}
+              <ul role="radiogroup" aria-label="Approved testimonials" className="max-h-[22rem] space-y-2 overflow-y-auto pr-1 scrollbar-thin">
+                {visible.map((t) => {
+                  const isSelected = t.id === selectedId;
+                  return (
+                    <li key={t.id}>
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={isSelected}
+                        onClick={() => setSelectedId(t.id)}
+                        className={cn(
+                          "flex w-full items-start gap-3 rounded-xl border px-3.5 py-3 text-left transition-colors",
+                          isSelected ? "border-foreground bg-muted/40" : "border-border hover:border-border-hover",
                         )}
+                      >
+                        <PersonAvatar name={t.author_name} src={t.author_avatar} size="sm" />
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className="text-sm font-medium text-foreground">{t.author_name}</span>
+                            <Stars rating={t.rating} size="xs" />
+                          </span>
+                          <span className="line-clamp-2 block text-sm text-muted-foreground">{t.content}</span>
+                        </span>
                         {isSelected && (
-                          <div className="absolute top-2 right-2 w-4 h-4 bg-primary rounded-full flex items-center justify-center">
-                            <Check className="w-2.5 h-2.5 text-primary-foreground" />
-                          </div>
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-foreground">
+                            <Check className="h-3 w-3 text-background" />
+                          </span>
                         )}
                       </button>
-                    );
-                  })}
-                </div>
-                {!isPro && !planLoading && (
-                  <div className="mt-3 text-xs text-muted-foreground flex items-center justify-between">
-                    <span>Pro formats unlock visual + video content.</span>
-                    <Link to="/dashboard/settings/billing" className="text-primary font-medium hover:underline">
-                      Upgrade to Pro
-                    </Link>
-                  </div>
-                )}
-                <Button
-                  className="w-full mt-5 h-9"
-                  disabled={selectedTestimonials.length === 0 || !selectedContentType || isGenerating}
-                  onClick={() => { setVariants([]); setActiveVariant(0); generateContent(); }}
-                >
-                  {isGenerating ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" />Generating…</> : <><Sparkles className="w-4 h-4 mr-1.5" />Generate</>}
+                    </li>
+                  );
+                })}
+                {visible.length === 0 && <li className="py-6 text-center text-sm text-muted-foreground">Nothing matches that search.</li>}
+              </ul>
+              {withoutText > 0 && (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {withoutText === 1 ? "1 approved recording is" : `${withoutText} approved recordings are`} not listed, because content is written from text.
+                </p>
+              )}
+            </section>
+
+            <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="content-step-2">
+              <div id="content-step-2">
+                <StepTitle step={2}>Pick a format</StepTitle>
+              </div>
+              <div role="radiogroup" aria-label="Format" className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {CONTENT_FORMATS.map((option) => {
+                  const Icon = FORMAT_ICONS[option.id];
+                  const isSelected = kind === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      onClick={() => setKind(option.id)}
+                      className={cn(
+                        "flex items-start gap-3 rounded-xl border px-3.5 py-3 text-left transition-colors",
+                        isSelected ? "border-foreground bg-muted/40" : "border-border hover:border-border-hover",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                          isSelected ? "bg-foreground text-background" : "bg-muted text-muted-foreground",
+                        )}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium text-foreground">{option.title}</span>
+                        <span className="block text-xs text-muted-foreground">{option.description}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <Button className="mt-5 w-full" size="lg" disabled={!selected || !kind || isGenerating} onClick={generate}>
+                {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PenLine className="mr-2 h-4 w-4" />}
+                {isGenerating ? "Writing your draft" : versions.length > 0 ? "Write another version" : "Write the draft"}
+              </Button>
+              {(!selected || !kind) && (
+                <p className="mt-2 text-center text-xs text-muted-foreground">
+                  {!selected ? "Pick a testimonial to start." : "Pick a format to continue."}
+                </p>
+              )}
+            </section>
+          </div>
+
+          <section
+            ref={draftRef}
+            className="scroll-mt-20 rounded-2xl border border-border bg-card p-5 sm:p-6 lg:sticky lg:top-6"
+            aria-live="polite"
+            aria-label="Draft"
+          >
+            {isGenerating ? (
+              <div role="status" className="space-y-3 py-2">
+                <p className="text-sm font-medium text-foreground">Writing your draft. This takes about 10 seconds.</p>
+                <Skeleton className="h-5 w-2/3" />
+                <Skeleton className="h-28 w-full" />
+                <Skeleton className="h-5 w-1/2" />
+              </div>
+            ) : failure ? (
+              <div className="flex flex-col items-center py-12 text-center" role="alert">
+                <AlertTriangle className="mb-3 h-6 w-6 text-warning" />
+                <p className="max-w-sm text-sm text-foreground">{failure}</p>
+                <Button variant="outline" className="mt-4" onClick={generate} disabled={!selected || !kind}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Try again
                 </Button>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            ) : current && selected ? (
+              <div className="space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="eyebrow">{CONTENT_FORMATS.find((f) => f.id === current.kind)?.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {current.saved ? "Saved to your library." : "This draft did not save. Copy it before you leave."}
+                    </p>
+                  </div>
+                  <CopyContentButton kind={current.kind} data={current.data} variant="default" />
+                </div>
 
-          {/* RIGHT - Output */}
-          <div className="space-y-4">
-            <Card className="bg-card border border-border rounded-xl shadow-none min-h-[520px]">
-              <CardContent className="p-5 h-full">
-                {!current && !isGenerating && (
-                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-light mb-4">
-                      <Sparkles className="w-5 h-5 text-primary" />
-                    </div>
-                    <h3 className="text-base font-semibold text-foreground mb-1.5">Ready to generate</h3>
-                    <p className="text-sm text-muted-foreground max-w-[220px]">Pick at least one testimonial and a format to get started.</p>
+                {versions.length > 1 && (
+                  <div role="tablist" aria-label="Versions" className="flex gap-1.5">
+                    {versions.map((_, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        role="tab"
+                        aria-selected={active === index}
+                        onClick={() => setActive(index)}
+                        className={cn(
+                          "rounded-full px-3 py-1 text-sm font-medium transition-colors",
+                          active === index ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        )}
+                      >
+                        Version {index + 1}
+                      </button>
+                    ))}
                   </div>
                 )}
-                {isGenerating && (
-                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                    <Loader2 className="w-6 h-6 text-primary animate-spin mb-4" />
-                    <h3 className="text-base font-semibold text-foreground mb-1">Generating…</h3>
-                    <p className="text-sm text-muted-foreground">This usually takes a few seconds.</p>
+
+                {current.unverified.length > 0 && (
+                  <div className="flex items-start gap-2.5 rounded-xl border border-warning/40 bg-warning-light px-4 py-3 text-sm text-foreground" role="alert">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                    <p>
+                      Check {current.unverified.length === 1 ? "this number" : "these numbers"} before you post:{" "}
+                      <span className="font-semibold">{current.unverified.join(", ")}</span>.{" "}
+                      {current.unverified.length === 1 ? "It is" : "They are"} not in the testimonial.
+                    </p>
                   </div>
                 )}
-                {current && !isGenerating && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Output</h3>
-                      <div className="flex gap-1">
-                        <Button variant="outline" size="sm" className="h-8" onClick={copyContent}><Copy className="w-3.5 h-3.5 mr-1.5" />Copy</Button>
-                        <Button variant="outline" size="sm" className="h-8" onClick={generateContent}><RefreshCw className="w-3.5 h-3.5 mr-1.5" />Regenerate</Button>
-                      </div>
-                    </div>
-                    {variants.length > 1 && (
-                      <div className="flex gap-1">
-                        {variants.map((_, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setActiveVariant(i)}
-                            className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                              activeVariant === i ? 'bg-primary-light text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
-                            }`}
-                          >
-                            Version {i + 1}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <ContentRenderer contentType={current.contentType} data={current.data} />
-                    {variants.length < 3 && (
-                      <Button variant="outline" size="sm" className="h-8 w-full" onClick={generateContent}>
-                        <Sparkles className="w-3.5 h-3.5 mr-1.5" />Generate another version
-                      </Button>
-                    )}
+
+                {!selected.consent_given && (
+                  <div className="flex items-start gap-2.5 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-foreground">
+                    <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                    <p>There is no permission on record for this testimonial. Ask {selected.author_name.split(/\s+/)[0]} before you publish their words.</p>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          </div>
+
+                <ContentRenderer kind={current.kind} data={current.data} />
+
+                <details className="group rounded-xl border border-border px-4 py-3">
+                  <summary className="cursor-pointer list-none text-sm font-medium text-foreground marker:hidden">
+                    <span className="group-open:hidden">Compare with what the client wrote</span>
+                    <span className="hidden group-open:inline">What the client wrote</span>
+                  </summary>
+                  <p className="quote mt-3 whitespace-pre-wrap text-base text-foreground">{selected.content}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {[maskName(selected.author_name, selected.display_preference), roleLine(selected.author_title, selected.author_company)]
+                      .filter(Boolean)
+                      .join(", ")}
+                  </p>
+                </details>
+
+                <p className="text-xs text-muted-foreground">
+                  AI wrote this draft. Read it against the client's words before you post it, and keep every claim true.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center px-4 py-16 text-center">
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-gold-light">
+                  <PenLine className="h-5 w-5 text-gold-deep" strokeWidth={1.75} />
+                </div>
+                <h2 className="display text-2xl text-foreground">Your draft shows up here</h2>
+                <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+                  Pick a testimonial and a format. Each draft is saved to your library, and the last {MAX_VERSIONS} versions stay here so you can compare them.
+                </p>
+              </div>
+            )}
+          </section>
         </div>
-      </div>
-    </div>
+      )}
+    </PageContainer>
   );
-};
-
-export default ContentStudio;
+}

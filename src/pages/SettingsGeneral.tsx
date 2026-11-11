@@ -1,220 +1,156 @@
-import { useState, useEffect, useRef } from "react";
-import { 
-  Building2, Palette, Globe, Bell, Save, Upload, Eye, Loader2
-} from "lucide-react";
-import { useDemoMode } from "@/contexts/DemoModeContext";
-import { useAuth } from "@/hooks/use-auth";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { Loader2, Upload } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import SettingsLayout from "@/components/settings/SettingsLayout";
+import { PersonAvatar } from "@/components/shared/PersonAvatar";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
+import { MAX_PHOTO_BYTES, resizeImageToSquare } from "@/lib/media";
 
-const SettingsGeneral = () => {
-  const { isDemoMode, toggleDemoMode } = useDemoMode();
+export default function SettingsGeneral() {
   const { user, profile, updateProfile } = useAuth();
-  const [demoConfirmOpen, setDemoConfirmOpen] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
-  const [industry, setIndustry] = useState("");
-  const [timezone, setTimezone] = useState("UTC");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [sendingReset, setSendingReset] = useState(false);
 
   useEffect(() => {
-    if (profile) {
-      setFullName(profile.full_name || "");
-      setCompanyName(profile.company_name || "");
-      setIndustry(profile.industry || "");
-      setTimezone(profile.timezone || "UTC");
-      setAvatarUrl(profile.avatar_url);
-    }
+    if (!profile) return;
+    setFullName(profile.full_name ?? "");
+    setCompanyName(profile.company_name ?? "");
+    setAvatarUrl(profile.avatar_url ?? null);
   }, [profile]);
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const dirty =
+    !!profile && (fullName.trim() !== (profile.full_name ?? "").trim() || companyName.trim() !== (profile.company_name ?? "").trim());
+
+  const uploadPhoto = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
     if (!file || !user) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("That file is not an image. Choose a JPG or PNG.");
+      return;
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      toast.error("That image is larger than 8 MB. Choose a smaller one.");
+      return;
+    }
     setIsUploading(true);
     try {
-      const ext = file.name.split('.').pop();
-      const path = `${user.id}/avatar.${ext}`;
+      const photo = await resizeImageToSquare(file, 320);
+      const path = `${user.id}/avatar.jpg`;
       const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(path, file, { upsert: true });
+        .from("avatars")
+        .upload(path, photo, { upsert: true, contentType: "image/jpeg", cacheControl: "3600" });
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
-      setAvatarUrl(publicUrl);
-      await updateProfile({ avatar_url: publicUrl });
-      toast.success('Avatar updated!');
+      const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+      // The path never changes, so the address needs a new suffix for browsers to load the new photo.
+      const url = `${data.publicUrl}?v=${Date.now()}`;
+      const { error } = await updateProfile({ avatar_url: url });
+      if (error) throw error;
+      setAvatarUrl(url);
+      toast.success("Photo updated");
     } catch (err) {
-      toast.error('Failed to upload avatar');
-      console.error(err);
+      console.error("Photo upload failed:", err);
+      toast.error("The photo did not upload. Try again.");
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleSave = async () => {
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!dirty || isSaving) return;
     setIsSaving(true);
-    const { error } = await updateProfile({
-      full_name: fullName,
-      company_name: companyName,
-      industry,
-      timezone,
-    });
+    const { error } = await updateProfile({ full_name: fullName.trim(), company_name: companyName.trim() });
     setIsSaving(false);
-    if (error) {
-      toast.error("Failed to save settings");
-    } else {
-      toast.success("Settings saved");
-    }
+    if (error) toast.error("Your changes did not save. Try again.");
+    else toast.success("Saved");
+  };
+
+  const sendPasswordLink = async () => {
+    if (!user?.email) return;
+    setSendingReset(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email, { redirectTo: `${window.location.origin}/login` });
+    setSendingReset(false);
+    if (error) toast.error("The email did not send. Wait a minute, then try again.");
+    else toast.success(`Check ${user.email} for a link to set a new password.`);
   };
 
   return (
     <SettingsLayout>
       <div className="space-y-6">
-        {/* Profile */}
-        <Card className="bg-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-primary" />Profile
-            </CardTitle>
-            <CardDescription>Your personal and organization information</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Avatar */}
-            <div className="flex items-center gap-4">
-              <Avatar className="h-16 w-16">
-                <AvatarImage src={avatarUrl || undefined} />
-                <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white text-xl">
-                  {fullName?.[0] || user?.email?.[0] || '?'}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAvatarUpload} />
-                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
-                  {isUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
-                  Upload Avatar
-                </Button>
-              </div>
-            </div>
+        <form onSubmit={save} className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+          <h2 className="text-base font-semibold text-foreground">Your details</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Your business name appears on your collection forms and in the permission text clients agree to.</p>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} className="mt-1" />
-              </div>
-              <div>
-                <Label htmlFor="companyName">Company Name</Label>
-                <Input id="companyName" value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="mt-1" />
-              </div>
+          <div className="mt-6 flex items-center gap-4">
+            <PersonAvatar name={fullName || user?.email} src={avatarUrl} size="xl" />
+            <div>
+              <input ref={fileInputRef} type="file" accept="image/*" className="sr-only" onChange={uploadPhoto} aria-label="Upload a profile photo" />
+              <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+                {isUploading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-1.5 h-3.5 w-3.5" />}
+                {avatarUrl ? "Change photo" : "Add a photo"}
+              </Button>
+              <p className="mt-1.5 text-xs text-muted-foreground">JPG or PNG, up to 8 MB.</p>
             </div>
+          </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="industry">Industry</Label>
-                <Select value={industry} onValueChange={setIndustry}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select industry" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="saas">SaaS</SelectItem>
-                    <SelectItem value="ecommerce">E-Commerce</SelectItem>
-                    <SelectItem value="agency">Agency</SelectItem>
-                    <SelectItem value="consulting">Consulting</SelectItem>
-                    <SelectItem value="healthcare">Healthcare</SelectItem>
-                    <SelectItem value="education">Education</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="timezone">Timezone</Label>
-                <Select value={timezone} onValueChange={setTimezone}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="UTC">UTC</SelectItem>
-                    <SelectItem value="America/New_York">Eastern (ET)</SelectItem>
-                    <SelectItem value="America/Chicago">Central (CT)</SelectItem>
-                    <SelectItem value="America/Denver">Mountain (MT)</SelectItem>
-                    <SelectItem value="America/Los_Angeles">Pacific (PT)</SelectItem>
-                    <SelectItem value="Europe/London">London (GMT)</SelectItem>
-                    <SelectItem value="Europe/Berlin">Berlin (CET)</SelectItem>
-                    <SelectItem value="Asia/Tokyo">Tokyo (JST)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="full-name">Your name</Label>
+              <Input id="full-name" autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} maxLength={120} className="mt-1.5" />
             </div>
-
-            <div className="text-sm text-muted-foreground">
-              Email: {user?.email}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Demo Mode */}
-        <Card className="bg-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Eye className="w-5 h-5 text-primary" />Demo & Preview
-            </CardTitle>
-            <CardDescription>Show sample data for demos and screenshots.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <Label>Demo Mode</Label>
-                <p className="text-sm text-muted-foreground">
-                  {isDemoMode ? "Currently showing sample data" : "Currently showing live data"}
-                </p>
-              </div>
-              <Switch
-                checked={isDemoMode}
-                onCheckedChange={() => {
-                  if (isDemoMode) setDemoConfirmOpen(true);
-                  else toggleDemoMode();
-                }}
+            <div>
+              <Label htmlFor="company-name">Business name</Label>
+              <Input
+                id="company-name"
+                autoComplete="organization"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                maxLength={120}
+                className="mt-1.5"
               />
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        <AlertDialog open={demoConfirmOpen} onOpenChange={setDemoConfirmOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Switch to live data?</AlertDialogTitle>
-              <AlertDialogDescription>Demo data will be hidden. You can switch back anytime.</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Keep Demo Mode</AlertDialogCancel>
-              <AlertDialogAction onClick={() => { toggleDemoMode(); setDemoConfirmOpen(false); }}>Switch to Live Data</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+          <div className="mt-6 flex justify-end">
+            <Button type="submit" disabled={!dirty || isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save changes
+            </Button>
+          </div>
+        </form>
 
-        {/* Save */}
-        <div className="flex justify-end">
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-            Save Changes
-          </Button>
-        </div>
+        <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+          <h2 className="text-base font-semibold text-foreground">Sign-in</h2>
+          <div className="mt-4 space-y-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">Email</p>
+              <p className="text-sm text-muted-foreground">{user?.email}</p>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">Password</p>
+                <p className="text-sm text-muted-foreground">We email you a link to set a new one.</p>
+              </div>
+              <Button variant="outline" onClick={sendPasswordLink} disabled={sendingReset}>
+                {sendingReset && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Email me a link
+              </Button>
+            </div>
+          </div>
+        </section>
       </div>
     </SettingsLayout>
   );
-};
-
-export default SettingsGeneral;
+}

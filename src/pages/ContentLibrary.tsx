@@ -1,200 +1,240 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { 
-  Search, Plus, Twitter, Linkedin, Mail, FileText,
-  Image, Scissors, Bot, Video, Copy, Trash2, MoreVertical, AlertCircle,
-  Calendar, Filter, Instagram
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { FileText, PenLine, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ContentRenderer } from "@/components/content/ContentRenderer";
+import { CopyButton } from "@/components/shared/CopyButton";
+import { PageContainer, PageHeader } from "@/components/shared/PageHeader";
+import { EmptyState, ErrorState } from "@/components/shared/States";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/use-auth";
+import type { Database } from "@/integrations/supabase/types";
 import { useWorkspace } from "@/hooks/use-workspace";
-import { readableStoredContent } from "@/components/content/ContentRenderer";
+import { contentTypeLabel, readableStoredContent, storedStructure } from "@/lib/content";
+import { formatDate, pluralize } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
-const typeConfig: Record<string, { label: string; icon: any }> = {
-  twitter_thread: { label: 'Twitter Thread', icon: Twitter },
-  linkedin_post: { label: 'LinkedIn Post', icon: Linkedin },
-  instagram_carousel: { label: 'Instagram', icon: Instagram },
-  email_snippet: { label: 'Email Snippet', icon: Mail },
-  case_study: { label: 'Case Study', icon: FileText },
-  quote_graphic: { label: 'Quote Graphic', icon: Image },
-  video_highlight: { label: 'Video Highlight', icon: Video },
-  ai_avatar: { label: 'AI Avatar', icon: Bot },
-};
+type SavedContent = Database["public"]["Tables"]["generated_content"]["Row"];
 
-const ContentLibrary = () => {
-  const { user } = useAuth();
+/** Every draft the content generator has written, newest first. */
+export default function ContentLibrary() {
   const { workspaceOwnerId } = useWorkspace();
   const queryClient = useQueryClient();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [openItem, setOpenItem] = useState<SavedContent | null>(null);
+  const [deleteItem, setDeleteItem] = useState<SavedContent | null>(null);
 
-  const { data: content = [], isLoading, error: contentError, refetch } = useQuery({
-    queryKey: ['generated-content', workspaceOwnerId],
-    queryFn: async () => {
-      if (!workspaceOwnerId) return [];
-      const { data, error } = await supabase
-        .from('generated_content')
-        .select('*')
-        .eq('user_id', workspaceOwnerId)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ["generated-content", workspaceOwnerId],
     enabled: !!workspaceOwnerId,
+    queryFn: async (): Promise<SavedContent[]> => {
+      const { data: rows, error: queryError } = await supabase
+        .from("generated_content")
+        .select("*")
+        .eq("user_id", workspaceOwnerId!)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (queryError) throw queryError;
+      return rows ?? [];
+    },
   });
 
-  const deleteContent = useMutation({
-    mutationFn: async (contentId: string) => {
-      const { error } = await supabase.from('generated_content').delete().eq('id', contentId);
-      if (error) throw error;
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error: deleteError } = await supabase.from("generated_content").delete().eq("id", id);
+      if (deleteError) throw deleteError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['generated-content'] });
-      toast.success('Content deleted');
+      void queryClient.invalidateQueries({ queryKey: ["generated-content"] });
+      toast.success("Draft deleted");
     },
-    onError: (e: Error) => toast.error('Failed to delete', { description: e.message }),
+    onError: () => toast.error("The draft was not deleted. Try again."),
   });
 
-  const filteredContent = content.filter(item => {
-    const readable = readableStoredContent(item.type, item.content);
-    const matchesSearch = readable.toLowerCase().includes(searchQuery.toLowerCase());
-    if (typeFilter === 'all') return matchesSearch;
-    return matchesSearch && item.type === typeFilter;
-  });
+  const items = useMemo(
+    () => (data ?? []).map((row) => ({ row, text: readableStoredContent(row.type, row.content) })),
+    [data],
+  );
 
-  const copyContent = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success('Content copied!');
-  };
+  const typesInUse = useMemo(() => [...new Set(items.map((item) => item.row.type as string))], [items]);
+
+  const visible = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return items.filter(
+      (item) => (typeFilter === "all" || item.row.type === typeFilter) && (!query || item.text.toLowerCase().includes(query)),
+    );
+  }, [items, search, typeFilter]);
+
+  const newDraftButton = (
+    <Button asChild>
+      <Link to="/dashboard/content">
+        <PenLine className="mr-2 h-4 w-4" />
+        New draft
+      </Link>
+    </Button>
+  );
+
+  const openStructure = openItem ? storedStructure(openItem.metadata) : null;
+  const openText = openItem ? readableStoredContent(openItem.type, openItem.content) : "";
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        <div className="flex items-end justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Content Library</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              <span className="tabular-nums">{content.length}</span> generated assets
+    <PageContainer>
+      <PageHeader
+        title="Saved content"
+        description={
+          items.length > 0 ? `${pluralize(items.length, "draft")} written from your testimonials.` : "Every draft you write is kept here."
+        }
+        actions={newDraftButton}
+      />
+
+      {error ? (
+        <ErrorState error={error} onRetry={() => void refetch()} />
+      ) : isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" role="status" aria-label="Loading saved content">
+          {Array.from({ length: 6 }, (_, i) => (
+            <Skeleton key={i} className="h-52 rounded-2xl" />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={FileText}
+          title="No drafts yet"
+          description="Pick a testimonial and a format, and AI writes a first draft from your client's own words."
+          actions={newDraftButton}
+        />
+      ) : (
+        <>
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Filter by format">
+              {["all", ...typesInUse].map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  role="tab"
+                  aria-selected={typeFilter === type}
+                  onClick={() => setTypeFilter(type)}
+                  className={cn(
+                    "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
+                    typeFilter === type ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  {type === "all" ? "All" : contentTypeLabel(type)}
+                </button>
+              ))}
+            </div>
+            <div className="relative w-full sm:w-64">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search drafts"
+                aria-label="Search drafts"
+                className="pl-10"
+              />
+            </div>
+          </div>
+
+          {visible.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-border py-14 text-center text-sm text-muted-foreground">
+              Nothing matches. Clear the search or pick another format.
             </p>
-          </div>
-          <Link to="/dashboard/content">
-            <Button size="sm"><Plus className="w-4 h-4 mr-1.5" />Create New</Button>
-          </Link>
-        </div>
+          ) : (
+            <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {visible.map(({ row, text }) => (
+                <li key={row.id} className="card-hover flex flex-col rounded-2xl border border-border bg-card p-5">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <span className="eyebrow">{contentTypeLabel(row.type)}</span>
+                    <span className="text-xs tabular-nums text-muted-foreground">{formatDate(row.created_at)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOpenItem(row)}
+                    className="flex-1 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label={`Open ${contentTypeLabel(row.type)} from ${formatDate(row.created_at)}`}
+                  >
+                    <p className="line-clamp-6 whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">{text}</p>
+                  </button>
+                  <div className="mt-4 flex items-center gap-2 border-t border-border pt-4">
+                    <CopyButton text={text} toastMessage="Copied" />
+                    <Button variant="ghost" size="sm" onClick={() => setOpenItem(row)}>
+                      Open
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="ml-auto text-muted-foreground hover:text-destructive"
+                      onClick={() => setDeleteItem(row)}
+                      aria-label="Delete draft"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
 
-        <div className="flex flex-col md:flex-row gap-3 mb-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="Search content..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-9 bg-card" />
-          </div>
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[170px] h-9 bg-card"><Filter className="w-3.5 h-3.5 mr-2" /><SelectValue placeholder="Filter" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="twitter_thread">Twitter</SelectItem>
-              <SelectItem value="linkedin_post">LinkedIn</SelectItem>
-              <SelectItem value="instagram_carousel">Instagram Carousel</SelectItem>
-              <SelectItem value="email_snippet">Email</SelectItem>
-              <SelectItem value="case_study">Case Study</SelectItem>
-              <SelectItem value="quote_graphic">Quote Graphic</SelectItem>
-              <SelectItem value="video_highlight">Video Highlight</SelectItem>
-              <SelectItem value="ai_avatar">AI Avatar</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <Dialog open={!!openItem} onOpenChange={(open) => !open && setOpenItem(null)}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          {openItem && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="display text-2xl font-normal">{contentTypeLabel(openItem.type)}</DialogTitle>
+                <DialogDescription>Written on {formatDate(openItem.created_at)}. Read it against the client's words before you post it.</DialogDescription>
+              </DialogHeader>
+              {openStructure ? (
+                <ContentRenderer kind={openStructure.kind} data={openStructure.data} />
+              ) : (
+                <p className="whitespace-pre-wrap rounded-xl border border-border bg-background/60 p-5 text-[0.9375rem] leading-relaxed text-foreground">
+                  {openText}
+                </p>
+              )}
+              <div>
+                <CopyButton text={openText} label="Copy all" size="default" variant="default" toastMessage="Copied" />
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
-        {contentError ? (
-          <div className="text-center py-16 border border-dashed border-destructive/30 rounded-xl">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-destructive/10 mb-4">
-              <AlertCircle className="w-5 h-5 text-destructive" />
-            </div>
-            <h3 className="text-base font-semibold text-foreground mb-1.5">Couldn't load content</h3>
-            <p className="text-sm text-muted-foreground mb-5">{contentError instanceof Error ? contentError.message : 'Something went wrong.'}</p>
-            <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
-          </div>
-        ) : isLoading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {[1,2,3].map(i => <Card key={i} className="bg-card"><CardContent className="p-5"><Skeleton className="h-32 w-full" /></CardContent></Card>)}
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {filteredContent.map((item) => {
-              const tc = typeConfig[item.type] || { label: item.type, icon: FileText };
-              const readable = readableStoredContent(item.type, item.content);
-              return (
-                <Card key={item.id} className="bg-card border border-border hover:border-border-hover transition-colors rounded-xl shadow-none group">
-                  <CardContent className="p-5">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-primary-light flex items-center justify-center">
-                          <tc.icon className="w-3.5 h-3.5 text-primary" />
-                        </div>
-                        <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{tc.label}</span>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 -mr-1 -mt-1 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-card border-border">
-                          <DropdownMenuItem className="cursor-pointer" onClick={() => copyContent(readable)}>
-                            <Copy className="w-4 h-4 mr-2" />Copy
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="cursor-pointer text-destructive" onClick={() => deleteContent.mutate(item.id)}>
-                            <Trash2 className="w-4 h-4 mr-2" />Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-
-                    <p className="text-sm text-foreground/80 line-clamp-4 mb-3 leading-relaxed whitespace-pre-wrap">{readable}</p>
-
-                    <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border">
-                      <span className="tabular-nums">{item.testimonial_ids?.length || 0} testimonials</span>
-                      <span className="tabular-nums">{new Date(item.created_at).toLocaleDateString()}</span>
-                    </div>
-
-                    <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="outline" size="sm" className="flex-1 h-8" onClick={() => copyContent(readable)}>
-                        <Copy className="w-3 h-3 mr-1.5" />Copy
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-
-        {!isLoading && filteredContent.length === 0 && (
-          <div className="text-center py-24 border border-dashed border-border rounded-xl">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-light mb-4">
-              <FileText className="w-5 h-5 text-primary" />
-            </div>
-            <h3 className="text-base font-semibold text-foreground mb-1.5">No content yet</h3>
-            <p className="text-sm text-muted-foreground mb-5">Create your first piece of content from testimonials.</p>
-            <Link to="/dashboard/content">
-              <Button size="sm"><Plus className="w-4 h-4 mr-1.5" />Create Content</Button>
-            </Link>
-          </div>
-        )}
-      </div>
-    </div>
+      <AlertDialog open={!!deleteItem} onOpenChange={(open) => !open && setDeleteItem(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this draft?</AlertDialogTitle>
+            <AlertDialogDescription>The draft is removed from your library. The testimonial it came from stays.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteItem) remove.mutate(deleteItem.id);
+                setDeleteItem(null);
+              }}
+            >
+              Delete draft
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </PageContainer>
   );
-};
-
-export default ContentLibrary;
+}
