@@ -128,8 +128,22 @@ Texts go out only through the `start-campaign` function. It checks the sender's 
    ALTER DATABASE postgres SET app.worker_key = '<the same INTERNAL_WORKER_KEY value>';
    ```
 
-3. Register the sending number with Twilio for A2P 10DLC (a Brand and a Campaign). Carriers block unregistered traffic.
-4. To let one account send before checkout is live, set its plan by hand:
+3. Turn the scheduler on. It is off by default, because two jobs that fire every minute keep a small database busy for nothing while texting is not set up:
+
+   ```sql
+   SELECT cron.schedule('promote-scheduled-campaigns', '* * * * *', $$ SELECT public.promote_scheduled_campaigns(); $$);
+   SELECT cron.schedule('drain-campaign-jobs', '* * * * *', $$
+     SELECT net.http_post(
+       url := current_setting('app.worker_url', true),
+       headers := jsonb_build_object('content-type', 'application/json', 'x-internal-key', current_setting('app.worker_key', true)),
+       body := '{}'::jsonb
+     ) WHERE current_setting('app.worker_url', true) IS NOT NULL;
+   $$);
+   SELECT cron.schedule('trim-cron-history', '17 3 * * *', $$ DELETE FROM cron.job_run_details WHERE end_time < now() - interval '2 days'; $$);
+   ```
+
+4. Register the sending number with Twilio for A2P 10DLC (a Brand and a Campaign). Carriers block unregistered traffic.
+5. To let one account send before checkout is live, set its plan by hand:
 
    ```sql
    UPDATE subscriptions SET plan = 'starter', status = 'active' WHERE user_id = '<the account owner id>';
@@ -146,6 +160,10 @@ The owner is responsible for consent. The builder makes them confirm that every 
 - [ ] Invite a second email address as "View only" and confirm it cannot approve.
 - [ ] If text campaigns are on, send one campaign to your own phone.
 - [ ] If billing is on, buy the Starter plan with a test card and confirm the plan shows on Settings, Plan and billing.
+
+## Database size
+
+The database runs on the Tiny instance. On 10 November 2026 it ran out of disk IO budget and stopped answering for hours. If the app is slow or sign-in hangs, open Cloud, Overview, Advanced settings in Lovable, check the health cards, and move the database up one size.
 
 ## Known limits
 
