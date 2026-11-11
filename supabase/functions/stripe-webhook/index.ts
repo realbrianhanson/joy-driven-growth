@@ -82,7 +82,7 @@ serve(async (req) => {
             .eq("stripe_payment_id", paymentId)
             .maybeSingle();
           if (existing) {
-            console.log("Duplicate webhook for", paymentId, "— skipping");
+            console.log("Duplicate webhook for", paymentId, "skipped");
             return new Response(
               JSON.stringify({ received: true, duplicate: true }),
               { headers: { ...corsHeaders, "Content-Type": "application/json" } }

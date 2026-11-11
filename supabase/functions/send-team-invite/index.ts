@@ -82,7 +82,9 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: "Happy Client <invites@happyclient.io>",
         to: [invite.email],
-        subject: `${inviterName} invited you to join their team on Happy Client`,
+        // A reply goes to the person who sent the invite.
+        ...(prof?.email ? { reply_to: prof.email } : {}),
+        subject: `${inviterName} invited you to their Happy Client account`,
         html,
       }),
     });
@@ -110,22 +112,24 @@ function json(body: unknown, status = 200) {
 function renderEmail(opts: { inviterName: string; companyName: string | null; role: string; acceptUrl: string }) {
   const { inviterName, companyName, role, acceptUrl } = opts;
   const org = companyName ? ` (${escapeHtml(companyName)})` : "";
+  const access = role === "admin" ? "You can add, edit and approve testimonials." : "You can view everything in the account.";
   return `<!doctype html>
-<html><body style="margin:0;padding:0;background:#F8F8FA;font-family:Inter,Arial,sans-serif;color:#0F172A;">
+<html><body style="margin:0;padding:0;background:#F8F6F1;font-family:Inter,Arial,sans-serif;color:#1A1714;">
   <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px;">
     <tr><td align="center">
-      <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;padding:40px;">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #E7E1D6;border-radius:16px;padding:40px;">
         <tr><td>
-          <h1 style="margin:0 0 16px;font-size:22px;font-weight:600;">You've been invited to a team</h1>
-          <p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#475569;">
-            <strong>${escapeHtml(inviterName)}</strong>${org} invited you to join their team on Happy Client as a <strong>${escapeHtml(role)}</strong>.
+          <h1 style="margin:0 0 16px;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:400;">You are invited to a team</h1>
+          <p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:#4A443C;">
+            <strong>${escapeHtml(inviterName)}</strong>${org} invited you to their account on Happy Client.
           </p>
-          <a href="${acceptUrl}" style="display:inline-block;background:#6366F1;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:500;font-size:14px;">
-            Accept invitation
+          <p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#4A443C;">${access}</p>
+          <a href="${acceptUrl}" style="display:inline-block;background:#1A1714;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:500;font-size:14px;">
+            Accept the invite
           </a>
-          <p style="margin:28px 0 0;font-size:12px;color:#94A3B8;line-height:1.5;">
-            This invite expires in 14 days. If the button doesn't work, paste this link in your browser:<br>
-            <span style="color:#64748B;word-break:break-all;">${acceptUrl}</span>
+          <p style="margin:28px 0 0;font-size:12px;color:#8A8378;line-height:1.5;">
+            This invite expires in 14 days. If the button does not work, paste this link into your browser:<br>
+            <span style="color:#6B645B;word-break:break-all;">${acceptUrl}</span>
           </p>
         </td></tr>
       </table>

@@ -1,194 +1,172 @@
-import { createClient } from 'npm:@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-api-key, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { clientIp, json, preflight } from "../_shared/http.ts";
+import {
+  cleanCustomFields,
+  cleanEmail,
+  cleanOptionalText,
+  cleanRating,
+  formSource,
+  isAllowedMediaUrl,
+} from "../_shared/submission.ts";
 
 async function sha256Hex(input: string): Promise<string> {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
+  const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
-function getClientIp(req: Request): string {
-  const xff = req.headers.get('x-forwarded-for') || ''
-  const ip = xff.split(',')[0]?.trim()
-  return ip || 'unknown'
-}
-
-// Only allow https URLs hosted on the project's own Supabase storage domain.
-function isAllowedMediaUrl(value: unknown, allowedHost: string): boolean {
-  if (typeof value !== 'string' || value.length === 0) return false
-  try {
-    const u = new URL(value)
-    return u.protocol === 'https:' && u.hostname === allowedHost
-  } catch {
-    return false
-  }
-}
-
+/**
+ * Saves a new testimonial as "pending" for the owner to review.
+ *
+ * Two callers reach it: a public collection form (identified by form_slug)
+ * and the developer API (identified by an x-api-key header). Every field is
+ * checked and trimmed here, because neither caller is trusted.
+ */
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
+  if (req.method === "OPTIONS") return preflight();
+  if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-  )
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  let storageHost = "";
+  try {
+    storageHost = new URL(supabaseUrl).hostname;
+  } catch {
+    return json({ error: "server_misconfigured" }, 500);
+  }
 
-  // IP-based rate limit: 20 / 60s.
-  const ip = getClientIp(req)
-  const { data: rlAllowed, error: rlErr } = await supabase.rpc('check_rate_limit', {
-    p_key: `submit-testimonial:${ip}`,
+  const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+  // 20 submissions per minute for each IP address.
+  const { data: allowed, error: limitError } = await supabase.rpc("check_rate_limit", {
+    p_key: `submit-testimonial:${clientIp(req)}`,
     p_max: 20,
     p_window_seconds: 60,
-  })
-  if (rlErr) console.error('rate_limit error', rlErr)
-  if (rlAllowed === false) return json({ error: 'rate_limited' }, 429)
+  });
+  if (limitError) console.error("rate limit check failed", limitError);
+  if (allowed === false) return json({ error: "rate_limited" }, 429);
 
-  let supabaseHost = ''
+  let parsed: unknown;
   try {
-    supabaseHost = new URL(Deno.env.get('SUPABASE_URL')!).hostname
+    parsed = await req.json();
   } catch {
-    return json({ error: 'server_misconfigured' }, 500)
+    return json({ error: "invalid_json" }, 400);
   }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return json({ error: "invalid_json" }, 400);
+  const body = parsed as Record<string, unknown>;
 
-  let body: any
-  try {
-    body = await req.json()
-  } catch {
-    return json({ error: 'invalid_json' }, 400)
-  }
+  // Find the account this testimonial belongs to: by form, or by API key.
+  let ownerUserId: string;
+  let formId: string | null = null;
+  let source = "api";
+  let apiKeyRowId: string | null = null;
 
-  // ── Resolve owner: either by form_slug (public form) or x-api-key (developer API) ──
-  let ownerUserId: string | null = null
-  let formId: string | null = null
-  let source = 'api'
-  let apiKeyRowId: string | null = null
-
-  const formSlug = body.form_slug ? String(body.form_slug) : null
-  const apiKey = req.headers.get('x-api-key') || ''
+  const formSlug = body.form_slug ? String(body.form_slug).slice(0, 200) : null;
+  const apiKey = req.headers.get("x-api-key") || "";
 
   if (formSlug) {
-    const { data: form, error: formErr } = await supabase
-      .from('forms')
-      .select('id, user_id, is_published')
-      .eq('slug', formSlug)
-      .maybeSingle()
-    if (formErr || !form) return json({ error: 'form_not_found' }, 404)
-    if (!form.is_published) return json({ error: 'form_not_published' }, 403)
-    ownerUserId = form.user_id
-    formId = form.id
-    source = body.source ? String(body.source) : 'form'
+    const { data: form, error: formError } = await supabase
+      .from("forms")
+      .select("id, user_id, is_published")
+      .eq("slug", formSlug)
+      .maybeSingle();
+    if (formError || !form) return json({ error: "form_not_found" }, 404);
+    if (!form.is_published) return json({ error: "form_not_published" }, 403);
+    ownerUserId = form.user_id;
+    formId = form.id;
+    source = formSource(body.source);
   } else {
-    if (!apiKey || apiKey.length < 20) return json({ error: 'missing_api_key_or_form_slug' }, 401)
-    const keyHash = await sha256Hex(apiKey)
-    const { data: keyRow, error: keyErr } = await supabase
-      .from('api_keys')
-      .select('id, user_id, revoked_at')
-      .eq('key_hash', keyHash)
-      .maybeSingle()
-    if (keyErr || !keyRow) return json({ error: 'invalid_api_key' }, 401)
-    if (keyRow.revoked_at) return json({ error: 'revoked_api_key' }, 401)
-    ownerUserId = keyRow.user_id
-    apiKeyRowId = keyRow.id
+    if (!apiKey || apiKey.length < 20) return json({ error: "missing_api_key_or_form_slug" }, 401);
+    const { data: keyRow, error: keyError } = await supabase
+      .from("api_keys")
+      .select("id, user_id, revoked_at")
+      .eq("key_hash", await sha256Hex(apiKey))
+      .maybeSingle();
+    if (keyError || !keyRow) return json({ error: "invalid_api_key" }, 401);
+    if (keyRow.revoked_at) return json({ error: "revoked_api_key" }, 401);
+    ownerUserId = keyRow.user_id;
+    apiKeyRowId = keyRow.id;
   }
 
-  const author_name = (body.author_name || '').toString().trim()
-  const content = (body.content || '').toString().trim()
-  if (!author_name || author_name.length > 200) return json({ error: 'invalid_author_name' }, 400)
-  if (content.length > 4000) return json({ error: 'invalid_content' }, 400)
+  const authorName = (body.author_name ?? "").toString().trim();
+  const content = (body.content ?? "").toString().trim();
+  if (!authorName || authorName.length > 200) return json({ error: "invalid_author_name" }, 400);
+  if (content.length > 4000) return json({ error: "invalid_content" }, 400);
 
-  const type = ['text', 'video', 'audio'].includes(body.type) ? body.type : 'text'
-  // Text submissions require content; video/audio can stand on their own
-  if (type === 'text' && !content) return json({ error: 'invalid_content' }, 400)
-  if (type === 'video' && !body.video_url) return json({ error: 'missing_video_url' }, 400)
-  if (type === 'audio' && !body.audio_url) return json({ error: 'missing_audio_url' }, 400)
+  const type = body.type === "video" || body.type === "audio" ? body.type : "text";
+  // A written testimonial needs words. A recording can stand alone.
+  if (type === "text" && !content) return json({ error: "invalid_content" }, 400);
+  if (type === "video" && !body.video_url) return json({ error: "missing_video_url" }, 400);
+  if (type === "audio" && !body.audio_url) return json({ error: "missing_audio_url" }, 400);
 
-  // Validate media URLs: must be https and hosted on the project storage domain.
-  if (body.video_url != null && !isAllowedMediaUrl(body.video_url, supabaseHost)) {
-    return json({ error: 'invalid_video_url' }, 400)
+  // Media must be a public file in this project's own storage.
+  if (body.video_url != null && !isAllowedMediaUrl(body.video_url, storageHost)) {
+    return json({ error: "invalid_video_url" }, 400);
   }
-  if (body.audio_url != null && !isAllowedMediaUrl(body.audio_url, supabaseHost)) {
-    return json({ error: 'invalid_audio_url' }, 400)
+  if (body.audio_url != null && !isAllowedMediaUrl(body.audio_url, storageHost)) {
+    return json({ error: "invalid_audio_url" }, 400);
   }
-  if (body.author_avatar != null && !isAllowedMediaUrl(body.author_avatar, supabaseHost)) {
-    return json({ error: 'invalid_author_avatar' }, 400)
-  }
-
-  const rating = body.rating != null ? Math.max(1, Math.min(5, parseInt(body.rating))) : null
-
-  const allowedDisplay = ['full', 'first_initial', 'anonymous'] as const
-  const display_preference = allowedDisplay.includes(body.display_preference)
-    ? body.display_preference
-    : 'full'
-  const consent_given = body.consent_given === true
-  const consent_text_raw = body.consent_text != null ? String(body.consent_text) : null
-  if (consent_text_raw && consent_text_raw.length > 2000) {
-    return json({ error: 'invalid_consent_text' }, 400)
-  }
-  const consent_text = consent_text_raw
-  const consent_timestamp = consent_given ? new Date().toISOString() : null
-
-  const already_developed = body.already_developed === true
-  const developed_content = typeof body.developed_content === 'string' ? body.developed_content.slice(0, 8000) : null
-  const developed_pull_quote = typeof body.developed_pull_quote === 'string' ? body.developed_pull_quote.slice(0, 300) : null
-  const developed_one_liner = typeof body.developed_one_liner === 'string' ? body.developed_one_liner.slice(0, 200) : null
-  const developed_at = already_developed && developed_content ? new Date().toISOString() : null
-
-  const insert = {
-    user_id: ownerUserId!,
-    form_id: formId,
-    author_name,
-    author_email: body.author_email ? String(body.author_email).slice(0, 200) : null,
-    author_title: body.author_title ? String(body.author_title).slice(0, 200) : null,
-    author_company: body.author_company ? String(body.author_company).slice(0, 200) : null,
-    content: content || null,
-    rating,
-    type,
-    video_url: body.video_url ? String(body.video_url) : null,
-    audio_url: body.audio_url ? String(body.audio_url) : null,
-    author_avatar: body.author_avatar ? String(body.author_avatar) : null,
-    custom_fields: body.custom_fields && typeof body.custom_fields === 'object' ? body.custom_fields : {},
-    status: 'pending',
-    source,
-    consent_given,
-    consent_text,
-    consent_timestamp,
-    display_preference,
-    developed_content: already_developed ? developed_content : null,
-    developed_pull_quote: already_developed ? developed_pull_quote : null,
-    developed_one_liner: already_developed ? developed_one_liner : null,
-    developed_at,
+  if (body.author_avatar != null && !isAllowedMediaUrl(body.author_avatar, storageHost)) {
+    return json({ error: "invalid_author_avatar" }, 400);
   }
 
-  const { data: inserted, error: insErr } = await supabase
-    .from('testimonials')
-    .insert(insert)
-    .select('id, created_at')
-    .single()
+  const customFields = cleanCustomFields(body.custom_fields);
+  if (customFields === null) return json({ error: "invalid_custom_fields" }, 400);
 
-  if (insErr) return json({ error: 'insert_failed', detail: insErr.message }, 500)
+  const displayPreference =
+    body.display_preference === "first_initial" || body.display_preference === "anonymous" ? body.display_preference : "full";
+
+  const consentGiven = body.consent_given === true;
+  const consentText = body.consent_text != null ? String(body.consent_text) : null;
+  if (consentText && consentText.length > 2000) return json({ error: "invalid_consent_text" }, 400);
+
+  // The guided interview sends a draft that the customer has read and approved.
+  const alreadyDeveloped = body.already_developed === true;
+  const developedContent = typeof body.developed_content === "string" ? body.developed_content.slice(0, 8000) : null;
+  const developedPullQuote = typeof body.developed_pull_quote === "string" ? body.developed_pull_quote.slice(0, 300) : null;
+  const developedOneLiner = typeof body.developed_one_liner === "string" ? body.developed_one_liner.slice(0, 200) : null;
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("testimonials")
+    .insert({
+      user_id: ownerUserId,
+      form_id: formId,
+      author_name: authorName,
+      author_email: cleanEmail(body.author_email),
+      author_title: cleanOptionalText(body.author_title, 200),
+      author_company: cleanOptionalText(body.author_company, 200),
+      content: content || null,
+      rating: cleanRating(body.rating),
+      type,
+      video_url: body.video_url ? String(body.video_url) : null,
+      audio_url: body.audio_url ? String(body.audio_url) : null,
+      author_avatar: body.author_avatar ? String(body.author_avatar) : null,
+      custom_fields: customFields,
+      status: "pending",
+      source,
+      consent_given: consentGiven,
+      consent_text: consentText,
+      consent_timestamp: consentGiven ? new Date().toISOString() : null,
+      display_preference: displayPreference,
+      developed_content: alreadyDeveloped ? developedContent : null,
+      developed_pull_quote: alreadyDeveloped ? developedPullQuote : null,
+      developed_one_liner: alreadyDeveloped ? developedOneLiner : null,
+      developed_at: alreadyDeveloped && developedContent ? new Date().toISOString() : null,
+    })
+    .select("id, created_at")
+    .single();
+
+  if (insertError) {
+    console.error("submit-testimonial insert error:", insertError);
+    return json({ error: "insert_failed" }, 500);
+  }
 
   if (apiKeyRowId) {
-    await supabase
-      .from('api_keys')
-      .update({ last_used_at: new Date().toISOString() })
-      .eq('id', apiKeyRowId)
+    await supabase.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", apiKeyRowId);
   }
-
   if (formId) {
-    await supabase.rpc('increment_form_submissions', { form_id: formId })
+    await supabase.rpc("increment_form_submissions", { form_id: formId });
   }
 
-  return json({ ok: true, testimonial: inserted })
-})
+  return json({ ok: true, testimonial: inserted });
+});

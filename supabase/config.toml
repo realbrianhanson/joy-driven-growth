@@ -38,3 +38,6 @@ verify_jwt = true
 
 [functions.develop-testimonial]
 verify_jwt = true
+
+[functions.start-campaign]
+verify_jwt = true
